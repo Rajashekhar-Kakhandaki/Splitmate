@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply font-body text-ink bg-paper transition-colors duration-300;
+}
+
+.dark body {
+  @apply bg-dark-bg text-dark-ink;
+}
+
+/* Dashed "stitching" border used on receipt-style cards */
+.stitched {
+  border: 2px dashed rgba(35, 32, 26, 0.25);
+}
+
+.dark .stitched {
+  border: 2px dashed rgba(45, 68, 56, 0.6);
+}
+
+/* Rotated rubber-stamp badge */
+.stamp {
+  transform: rotate(-6deg);
+}
+
+/* Smooth theme transitions */
+*, *::before, *::after {
+  transition-property: background-color, border-color, color;
+  transition-duration: 200ms;
+  transition-timing-function: ease;
+}

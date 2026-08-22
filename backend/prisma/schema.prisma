@@ -1,0 +1,171 @@
+// SplitMate database schema
+// Covers all phases from the build spec. Phase 1 only wires up User + auth;
+// the rest of the models exist now so later phases are pure feature work,
+// not schema surgery.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum SettlementStatus {
+  pending
+  settled
+}
+
+enum RecurringFrequency {
+  weekly
+  monthly
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash     String    @map("password")
+  avatarUrl        String?   @map("avatar_url")
+  resetToken       String?   @map("reset_token")
+  resetTokenExpiry DateTime? @map("reset_token_expiry")
+  createdAt        DateTime  @default(now())
+
+  roomsCreated      Room[]             @relation("RoomCreator")
+  roomMemberships   RoomMember[]
+  expensesPaid      Expense[]          @relation("ExpensePayer")
+  expenseShares     ExpenseShare[]
+  personalExpenses  PersonalExpense[]
+  settlementsPaying    Settlement[]    @relation("SettlementPayer")
+  settlementsReceiving Settlement[]    @relation("SettlementReceiver")
+  recurringExpenses RecurringExpense[]
+
+  @@map("users")
+}
+
+model Room {
+  id        String   @id @default(uuid())
+  roomName  String   @map("room_name")
+  roomCode  String   @unique @map("room_code")
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now())
+
+  creator   User              @relation("RoomCreator", fields: [createdBy], references: [id])
+  members   RoomMember[]
+  expenses  Expense[]
+  recurring RecurringExpense[]
+  budget    RoomBudget?
+
+  @@map("rooms")
+}
+
+model RoomMember {
+  id       String   @id @default(uuid())
+  roomId   String   @map("room_id")
+  userId   String   @map("user_id")
+  joinedAt DateTime @default(now())
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade, map: "room_members_room_fkey")
+  user User @relation(fields: [userId], references: [id], map: "room_members_user_fkey")
+
+  @@unique([roomId, userId])
+  @@map("room_members")
+}
+
+model Expense {
+  id       String   @id @default(uuid())
+  roomId   String   @map("room_id")
+  title    String
+  amount   Decimal  @db.Decimal(10, 2)
+  category String
+  paidBy   String   @map("paid_by")
+  date     DateTime @default(now())
+  note     String?
+  receiptUrl String? @map("receipt_url")
+
+  room   Room           @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  payer  User           @relation("ExpensePayer", fields: [paidBy], references: [id])
+  shares ExpenseShare[]
+
+  @@map("expenses")
+}
+
+model ExpenseShare {
+  id           String  @id @default(uuid())
+  expenseId    String  @map("expense_id")
+  memberId     String  @map("member_id")
+  shareAmount  Decimal @map("share_amount") @db.Decimal(10, 2)
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  member  User    @relation(fields: [memberId], references: [id])
+
+  @@unique([expenseId, memberId])
+  @@map("expense_shares")
+}
+
+model PersonalExpense {
+  id       String   @id @default(uuid())
+  userId   String   @map("user_id")
+  title    String
+  amount   Decimal  @db.Decimal(10, 2)
+  category String
+  date     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("personal_expenses")
+}
+
+model Settlement {
+  id       String            @id @default(uuid())
+  payer    String
+  receiver String
+  amount   Decimal           @db.Decimal(10, 2)
+  date          DateTime          @default(now())
+  status        SettlementStatus  @default(pending)
+  paymentMethod String?           @map("payment_method")
+
+  payerUser    User @relation("SettlementPayer", fields: [payer], references: [id])
+  receiverUser User @relation("SettlementReceiver", fields: [receiver], references: [id])
+
+  @@map("settlements")
+}
+
+// --- Recurring Expenses ---
+// A template that auto-generates expenses on a schedule.
+// "apply" endpoint creates the actual Expense and advances nextDueDate.
+model RecurringExpense {
+  id             String             @id @default(uuid())
+  roomId         String             @map("room_id")
+  title          String
+  amount         Decimal            @db.Decimal(10, 2)
+  category       String
+  paidBy         String             @map("paid_by")
+  frequency      RecurringFrequency
+  nextDueDate    DateTime           @map("next_due_date")
+  // "all" = split with every room member; "custom" = use splitMemberIds list
+  splitWith      String             @default("all") @map("split_with")
+  splitMemberIds String[]           @default([]) @map("split_member_ids")
+  note           String?
+  createdAt      DateTime           @default(now())
+
+  room  Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  payer User @relation(fields: [paidBy], references: [id])
+
+  @@map("recurring_expenses")
+}
+
+// --- Room Budget ---
+// One budget record per room. Stores the monthly spending limit.
+model RoomBudget {
+  id           String   @id @default(uuid())
+  roomId       String   @unique @map("room_id")
+  monthlyLimit Decimal  @map("monthly_limit") @db.Decimal(10, 2)
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@map("room_budgets")
+}
