@@ -26,7 +26,7 @@ async function signup(req, res, next) {
 
     res.status(201).json({
       token,
-      user: { id: user.id, name: user.name, email: user.email },
+      user: { id: user.id, name: user.name, email: user.email, avatarUrl: user.avatarUrl },
     });
   } catch (err) {
     next(err);
@@ -52,7 +52,7 @@ async function login(req, res, next) {
 
     res.json({
       token,
-      user: { id: user.id, name: user.name, email: user.email },
+      user: { id: user.id, name: user.name, email: user.email, avatarUrl: user.avatarUrl },
     });
   } catch (err) {
     next(err);
@@ -64,7 +64,7 @@ async function me(req, res, next) {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
-      select: { id: true, name: true, email: true, createdAt: true },
+      select: { id: true, name: true, email: true, createdAt: true, avatarUrl: true },
     });
 
     if (!user) {
