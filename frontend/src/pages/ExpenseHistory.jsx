@@ -163,7 +163,7 @@ export default function ExpenseHistory() {
                 </label>
 
                 <label className="block">
-                  <span className={labelCls}>Paid by</span>
+                  <span className={labelCls}>Member / Paid by</span>
                   <select
                     value={payer}
                     onChange={(e) => setPayer(e.target.value)}
@@ -240,61 +240,88 @@ export default function ExpenseHistory() {
                 </div>
                 
                 <div className="divide-y divide-ink/5 dark:divide-white/5">
-                  {expenses?.map((exp) => (
-                    <div key={exp.id} className="group flex items-center justify-between py-5 gap-4 hover:bg-ink/5 dark:hover:bg-white/5 -mx-4 px-4 rounded-xl transition-colors">
-                      <div className="flex items-center gap-4 min-w-0">
-                        {exp.receiptUrl ? (
-                          <a href={receiptImageUrl(exp.receiptUrl)} target="_blank" rel="noreferrer" className="shrink-0 relative overflow-hidden rounded-xl border border-ink/10 dark:border-white/10 shadow-sm">
-                            <img
-                              src={receiptImageUrl(exp.receiptUrl)}
-                              alt="Receipt"
-                              className="w-14 h-14 object-cover hover:scale-110 transition-transform duration-300"
-                            />
-                          </a>
-                        ) : (
-                          <div className="shrink-0 w-14 h-14 rounded-xl bg-ink/5 dark:bg-white/5 flex items-center justify-center border border-ink/5 dark:border-white/5">
-                            <span className="font-mono text-sm text-ink/40 dark:text-white/40">{exp.category.slice(0, 2).toUpperCase()}</span>
-                          </div>
-                        )}
-                        <div className="min-w-0">
-                          <p className="text-lg font-medium truncate text-ink dark:text-white">{exp.title}</p>
-                          <p className="text-sm text-ink/60 dark:text-white/50 mt-0.5">
-                            {exp.category} · paid by <span className="font-medium text-ink/80 dark:text-white/80">{exp.paidBy.name}</span>
-                          </p>
-                          {exp.note && (
-                            <p className="text-xs text-ink/40 dark:text-white/40 mt-1 line-clamp-1 italic">
-                              "{exp.note}"
-                            </p>
+                  {expenses?.map((exp) => {
+                    const selectedMemberShare = payer ? exp.shares?.find((s) => s.memberId === payer) : null;
+                    const isSelectedMemberPayer = payer ? exp.paidBy.id === payer : true;
+                    const isIndividual = exp.shares && exp.shares.length === 1;
+
+                    let displayAmount = exp.amount;
+                    let amountSubtitle = null;
+
+                    if (payer && !isSelectedMemberPayer && selectedMemberShare) {
+                      displayAmount = selectedMemberShare.shareAmount;
+                      const selectedName = room?.members.find((m) => m.id === payer)?.name || "Member";
+                      amountSubtitle = `${selectedName}'s split share (Total bill: ${formatRupees(exp.amount)})`;
+                    }
+
+                    return (
+                      <div key={exp.id} className="group flex items-center justify-between py-5 gap-4 hover:bg-ink/5 dark:hover:bg-white/5 -mx-4 px-4 rounded-xl transition-colors">
+                        <div className="flex items-center gap-4 min-w-0">
+                          {exp.receiptUrl ? (
+                            <a href={receiptImageUrl(exp.receiptUrl)} target="_blank" rel="noreferrer" className="shrink-0 relative overflow-hidden rounded-xl border border-ink/10 dark:border-white/10 shadow-sm">
+                              <img
+                                src={receiptImageUrl(exp.receiptUrl)}
+                                alt="Receipt"
+                                className="w-14 h-14 object-cover hover:scale-110 transition-transform duration-300"
+                              />
+                            </a>
+                          ) : (
+                            <div className="shrink-0 w-14 h-14 rounded-xl bg-ink/5 dark:bg-white/5 flex items-center justify-center border border-ink/5 dark:border-white/5">
+                              <span className="font-mono text-sm text-ink/40 dark:text-white/40">{exp.category.slice(0, 2).toUpperCase()}</span>
+                            </div>
                           )}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-lg font-medium truncate text-ink dark:text-white">{exp.title}</p>
+                              {isIndividual && (
+                                <span className="shrink-0 text-[10px] font-mono uppercase tracking-wider bg-cover/10 text-cover dark:text-gold dark:bg-gold/10 px-2 py-0.5 rounded-full border border-cover/20 dark:border-gold/20">
+                                  Personal
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-ink/60 dark:text-white/50 mt-0.5">
+                              {exp.category} · paid by <span className="font-medium text-ink/80 dark:text-white/80">{exp.paidBy.name}</span>
+                            </p>
+                            {amountSubtitle && (
+                              <p className="text-xs font-mono text-cover dark:text-gold mt-0.5">
+                                {amountSubtitle}
+                              </p>
+                            )}
+                            {exp.note && (
+                              <p className="text-xs text-ink/40 dark:text-white/40 mt-1 line-clamp-1 italic">
+                                "{exp.note}"
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0 flex items-center gap-4 border-l border-ink/5 dark:border-white/5 pl-4 ml-2">
+                          <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity absolute right-4 bg-white/80 dark:bg-black/80 backdrop-blur-md p-1 rounded-lg border border-ink/10 dark:border-white/10 shadow-lg">
+                            <button onClick={() => setEditingExpense(exp)} className="text-[10px] uppercase tracking-widest font-medium text-ink/70 dark:text-white/70 hover:text-cover dark:hover:text-gold px-3 py-1.5 hover:bg-ink/5 dark:hover:bg-white/5 rounded-md transition-colors text-left">
+                              Edit
+                            </button>
+                            <button onClick={() => setDeletingExpense(exp)} className="text-[10px] uppercase tracking-widest font-medium text-owe/70 hover:text-owe px-3 py-1.5 hover:bg-owe/10 rounded-md transition-colors text-left">
+                              Delete
+                            </button>
+                          </div>
+                          <div className="text-right group-hover:opacity-10 transition-opacity">
+                            <p className="font-mono text-xl font-medium text-ink dark:text-white">{formatRupees(displayAmount)}</p>
+                            <p className="text-[10px] uppercase tracking-widest text-ink/40 dark:text-white/30 mt-1 flex flex-col items-end gap-0.5">
+                              <span>
+                                {new Date(exp.date).toLocaleDateString("en-IN", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                })}
+                              </span>
+                              <span className="text-[9px] opacity-70">
+                                {new Date(exp.date).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
+                              </span>
+                            </p>
+                          </div>
                         </div>
                       </div>
-                      <div className="text-right shrink-0 flex items-center gap-4 border-l border-ink/5 dark:border-white/5 pl-4 ml-2">
-                        <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity absolute right-4 bg-white/80 dark:bg-black/80 backdrop-blur-md p-1 rounded-lg border border-ink/10 dark:border-white/10 shadow-lg">
-                          <button onClick={() => setEditingExpense(exp)} className="text-[10px] uppercase tracking-widest font-medium text-ink/70 dark:text-white/70 hover:text-cover dark:hover:text-gold px-3 py-1.5 hover:bg-ink/5 dark:hover:bg-white/5 rounded-md transition-colors text-left">
-                            Edit
-                          </button>
-                          <button onClick={() => setDeletingExpense(exp)} className="text-[10px] uppercase tracking-widest font-medium text-owe/70 hover:text-owe px-3 py-1.5 hover:bg-owe/10 rounded-md transition-colors text-left">
-                            Delete
-                          </button>
-                        </div>
-                        <div className="text-right group-hover:opacity-10 transition-opacity">
-                          <p className="font-mono text-xl font-medium text-ink dark:text-white">{formatRupees(exp.amount)}</p>
-                          <p className="text-[10px] uppercase tracking-widest text-ink/40 dark:text-white/30 mt-1 flex flex-col items-end gap-0.5">
-                            <span>
-                              {new Date(exp.date).toLocaleDateString("en-IN", {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                              })}
-                            </span>
-                            <span className="text-[9px] opacity-70">
-                              {new Date(exp.date).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
-                            </span>
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}

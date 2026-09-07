@@ -205,7 +205,14 @@ export default function RoomDetail() {
                           </div>
                         )}
                         <div className="min-w-0">
-                          <p className="text-base font-medium truncate text-ink dark:text-white">{exp.title}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-base font-medium truncate text-ink dark:text-white">{exp.title}</p>
+                            {exp.shares && exp.shares.length === 1 && (
+                              <span className="shrink-0 text-[9px] font-mono uppercase tracking-wider bg-cover/10 text-cover dark:text-gold dark:bg-gold/10 px-2 py-0.5 rounded-full border border-cover/20 dark:border-gold/20">
+                                Personal
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-ink/50 dark:text-white/40 mt-0.5">
                             {exp.category} · paid by <span className="font-medium text-ink/70 dark:text-white/70">{exp.paidBy.name}</span>
                           </p>

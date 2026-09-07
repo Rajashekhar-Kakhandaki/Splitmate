@@ -156,7 +156,10 @@ async function listExpenses(req, res, next) {
       where.title = { contains: keyword, mode: "insensitive" };
     }
     if (payer) {
-      where.paidBy = payer;
+      where.OR = [
+        { paidBy: payer },
+        { shares: { some: { memberId: payer } } },
+      ];
     }
     if (from || to) {
       where.date = {};
@@ -179,7 +182,14 @@ async function listExpenses(req, res, next) {
       },
     });
 
-    res.json({ expenses: expenses.map(serializeExpense) });
+    // Filter out individual expenses belonging to other members.
+    // Shared expenses (shares.length > 1) are visible to all members.
+    // Individual expenses (shares.length === 1) are visible ONLY to the member in that share.
+    const visibleExpenses = expenses.filter((e) =>
+      e.shares.length > 1 || (e.shares.length === 1 && e.shares.some((s) => s.memberId === req.user.id))
+    );
+
+    res.json({ expenses: visibleExpenses.map(serializeExpense) });
   } catch (err) {
     next(err);
   }
@@ -284,6 +294,11 @@ async function getDashboard(req, res, next) {
       return { day, total: round2(total) };
     });
 
+    // Filter recent expenses visible to current user (shared + user's own individual)
+    const visibleRecentExpenses = allExpenses.filter((e) =>
+      e.shares.length > 1 || (e.shares.length === 1 && e.shares.some((s) => s.memberId === req.user.id))
+    );
+
     res.json({
       totalThisMonth: round2(totalThisMonth),
       myContributionThisMonth: round2(myContributionThisMonth),
@@ -294,7 +309,7 @@ async function getDashboard(req, res, next) {
       monthlyTrend,
       memberContribution,
       dailyTrend,
-      recentExpenses: allExpenses.slice(0, 10).map(serializeExpense),
+      recentExpenses: visibleRecentExpenses.slice(0, 10).map(serializeExpense),
     });
   } catch (err) {
     next(err);
