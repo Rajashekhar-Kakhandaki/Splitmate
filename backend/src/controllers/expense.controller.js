@@ -210,11 +210,24 @@ async function getDashboard(req, res, next) {
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
 
+    const membersWithNames = await prisma.roomMember.findMany({
+      where: { roomId },
+      include: { user: { select: { id: true, name: true } } },
+    });
+
     const thisMonthExpenses = allExpenses.filter((e) => e.date >= startOfMonth);
-    const totalThisMonth = thisMonthExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
-    const myContributionThisMonth = thisMonthExpenses
-      .filter((e) => e.paidBy === req.user.id)
-      .reduce((sum, e) => sum + Number(e.amount), 0);
+
+    // Shared group expenses are expenses split between 2 or more room members.
+    // Individual/personal expenses (shares.length === 1) are excluded from the group room total.
+    const sharedThisMonthExpenses = thisMonthExpenses.filter((e) => e.shares.length > 1);
+    const totalThisMonth = sharedThisMonthExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+
+    // "Your spend this month": the user's allocated share of expenses logged this month (both shared and individual).
+    // This immediately includes their share when an expense is split, regardless of settlement status.
+    const myContributionThisMonth = thisMonthExpenses.reduce((sum, e) => {
+      const share = e.shares.find((s) => s.memberId === req.user.id);
+      return sum + (share ? Number(share.shareAmount) : 0);
+    }, 0);
 
     // Balances — single source of truth shared with the Settle Up tab,
     // so "you owe ₹X" here always matches what Settle Up suggests.
@@ -228,19 +241,19 @@ async function getDashboard(req, res, next) {
       ...myOwedTo.map((s) => ({ memberId: s.from, name: s.fromName, amount: s.amount, direction: "owed" })),
     ];
 
-    // Category-wise breakdown, this month — feeds the pie chart.
+    // Category-wise breakdown, this month — feeds the pie chart for shared group expenses.
     const categoryBreakdown = {};
-    for (const e of thisMonthExpenses) {
+    for (const e of sharedThisMonthExpenses) {
       categoryBreakdown[e.category] = round2((categoryBreakdown[e.category] || 0) + Number(e.amount));
     }
 
-    // Monthly spending trend — last 6 months, oldest first.
+    // Monthly spending trend — last 6 months, oldest first (shared group expenses).
     const monthlyTrend = [];
     for (let i = 5; i >= 0; i--) {
       const monthDate = new Date(startOfMonth.getFullYear(), startOfMonth.getMonth() - i, 1);
       const nextMonthDate = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1);
       const total = allExpenses
-        .filter((e) => e.date >= monthDate && e.date < nextMonthDate)
+        .filter((e) => e.shares.length > 1 && e.date >= monthDate && e.date < nextMonthDate)
         .reduce((sum, e) => sum + Number(e.amount), 0);
       monthlyTrend.push({
         month: monthDate.toLocaleDateString("en-IN", { month: "short", year: "2-digit" }),
@@ -248,26 +261,24 @@ async function getDashboard(req, res, next) {
       });
     }
 
-    // Member-wise contribution, this month — who's fronted the most cash.
-    const membersWithNames = await prisma.roomMember.findMany({
-      where: { roomId },
-      include: { user: { select: { id: true, name: true } } },
+    // Member-wise spend breakdown, this month — each member's total allocated share of expenses.
+    const memberContribution = membersWithNames.map((m) => {
+      const memberShareTotal = thisMonthExpenses.reduce((sum, e) => {
+        const share = e.shares.find((s) => s.memberId === m.user.id);
+        return sum + (share ? Number(share.shareAmount) : 0);
+      }, 0);
+      return {
+        id: m.user.id,
+        name: m.user.name,
+        total: round2(memberShareTotal),
+      };
     });
-    const memberContribution = membersWithNames.map((m) => ({
-      id: m.user.id,
-      name: m.user.name,
-      total: round2(
-        thisMonthExpenses
-          .filter((e) => e.paidBy === m.user.id)
-          .reduce((sum, e) => sum + Number(e.amount), 0)
-      ),
-    }));
 
-    // Daily spending trend, this month — feeds a small sparkline/line chart.
+    // Daily spending trend, this month — feeds a small sparkline/line chart for shared group expenses.
     const daysSoFar = new Date().getDate();
     const dailyTrend = Array.from({ length: daysSoFar }, (_, i) => {
       const day = i + 1;
-      const total = thisMonthExpenses
+      const total = sharedThisMonthExpenses
         .filter((e) => e.date.getDate() === day)
         .reduce((sum, e) => sum + Number(e.amount), 0);
       return { day, total: round2(total) };

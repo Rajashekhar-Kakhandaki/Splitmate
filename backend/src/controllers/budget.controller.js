@@ -34,10 +34,11 @@ async function getBudget(req, res, next) {
 
     const expenses = await prisma.expense.findMany({
       where: { roomId, date: { gte: startOfMonth } },
-      select: { amount: true },
+      include: { shares: true },
     });
 
-    const totalThisMonth = round2(expenses.reduce((s, e) => s + Number(e.amount), 0));
+    const sharedExpenses = expenses.filter((e) => e.shares.length > 1);
+    const totalThisMonth = round2(sharedExpenses.reduce((s, e) => s + Number(e.amount), 0));
     const monthlyLimit = budget ? Number(budget.monthlyLimit) : null;
     const percentage = monthlyLimit && monthlyLimit > 0
       ? Math.round((totalThisMonth / monthlyLimit) * 100)
