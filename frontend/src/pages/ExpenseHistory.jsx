@@ -294,12 +294,26 @@ export default function ExpenseHistory() {
                             )}
                           </div>
                         </div>
-                        <div className="text-right shrink-0 flex items-center gap-4 border-l border-ink/5 dark:border-white/5 pl-4 ml-2">
-                          <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity absolute right-4 bg-white/80 dark:bg-black/80 backdrop-blur-md p-1 rounded-lg border border-ink/10 dark:border-white/10 shadow-lg">
-                            <button onClick={() => setEditingExpense(exp)} className="text-[10px] uppercase tracking-widest font-medium text-ink/70 dark:text-white/70 hover:text-cover dark:hover:text-gold px-3 py-1.5 hover:bg-ink/5 dark:hover:bg-white/5 rounded-md transition-colors text-left">
+                        <div className="text-right shrink-0 flex items-center gap-4 border-l border-ink/5 dark:border-white/5 pl-4 ml-2 relative">
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 absolute right-4 z-20 bg-white/95 dark:bg-[#1a1a1a]/95 backdrop-blur-md p-1 rounded-xl border border-ink/15 dark:border-white/15 shadow-xl">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingExpense(exp);
+                              }}
+                              className="text-xs uppercase tracking-wider font-semibold text-ink/80 dark:text-white/80 hover:text-cover dark:hover:text-gold px-3 py-1.5 hover:bg-ink/5 dark:hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+                            >
                               Edit
                             </button>
-                            <button onClick={() => setDeletingExpense(exp)} className="text-[10px] uppercase tracking-widest font-medium text-owe/70 hover:text-owe px-3 py-1.5 hover:bg-owe/10 rounded-md transition-colors text-left">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeletingExpense(exp);
+                              }}
+                              className="text-xs uppercase tracking-wider font-semibold text-owe hover:text-red-500 px-3 py-1.5 hover:bg-owe/10 rounded-lg transition-colors cursor-pointer"
+                            >
                               Delete
                             </button>
                           </div>
