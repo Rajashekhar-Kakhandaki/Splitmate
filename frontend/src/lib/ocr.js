@@ -1,4 +1,52 @@
-import { createWorker } from "tesseract.js";
+/**
+ * Downscales an input image File to a max dimension (default 1000px) using an HTML Canvas.
+ * This prevents WebAssembly out-of-memory crashes when processing multi-megapixel photos on mobile.
+ */
+export async function resizeImageForOcr(file, maxDimension = 1000) {
+  return new Promise((resolve) => {
+    if (!file || !file.type.startsWith("image/")) {
+      return resolve(file);
+    }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width <= maxDimension && height <= maxDimension) {
+        return resolve(file);
+      }
+      if (width > height) {
+        height = Math.round((height * maxDimension) / width);
+        width = maxDimension;
+      } else {
+        width = Math.round((width * maxDimension) / height);
+        height = maxDimension;
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return resolve(file);
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) return resolve(file);
+          const resizedFile = new File([blob], file.name || "receipt.jpg", {
+            type: blob.type || "image/jpeg",
+          });
+          resolve(resizedFile);
+        },
+        "image/jpeg",
+        0.85
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(file);
+    };
+    img.src = url;
+  });
+}
 
 /**
  * Runs client-side OCR on a receipt image and makes a best-effort guess at
@@ -11,25 +59,35 @@ import { createWorker } from "tesseract.js";
  * @returns {Promise<{ text: string, guessedAmount: number|null, guessedTitle: string|null }>}
  */
 export async function scanReceipt(file, onProgress) {
-  const worker = await createWorker("eng", 1, {
-    logger: (m) => {
-      if (m.status === "recognizing text" && onProgress) {
-        onProgress(m.progress);
-      }
-    },
-  });
-
   try {
-    const {
-      data: { text },
-    } = await worker.recognize(file);
+    const resizedFile = await resizeImageForOcr(file, 1000);
+    const worker = await createWorker("eng", 1, {
+      logger: (m) => {
+        if (m.status === "recognizing text" && onProgress) {
+          onProgress(m.progress);
+        }
+      },
+    });
+
+    try {
+      const {
+        data: { text },
+      } = await worker.recognize(resizedFile);
+      return {
+        text,
+        guessedAmount: guessTotalAmount(text),
+        guessedTitle: guessTitle(text),
+      };
+    } finally {
+      await worker.terminate();
+    }
+  } catch (err) {
+    console.warn("OCR failed or was bypassed:", err);
     return {
-      text,
-      guessedAmount: guessTotalAmount(text),
-      guessedTitle: guessTitle(text),
+      text: "",
+      guessedAmount: null,
+      guessedTitle: null,
     };
-  } finally {
-    await worker.terminate();
   }
 }
 

@@ -11,6 +11,7 @@ import AnalyticsCharts from "../components/AnalyticsCharts.jsx";
 import DownloadReportButton from "../components/DownloadReportButton.jsx";
 import BudgetAlert from "../components/BudgetAlert.jsx";
 import RecurringExpenses from "../components/RecurringExpenses.jsx";
+import ReceiptModal from "../components/ReceiptModal.jsx";
 
 export default function RoomDetail() {
   const { id } = useParams();
@@ -22,6 +23,7 @@ export default function RoomDetail() {
   const [copied, setCopied] = useState(false);
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [viewingReceipt, setViewingReceipt] = useState(null);
 
   const loadAll = useCallback(async () => {
     const [roomRes, dashboardRes] = await Promise.all([
@@ -192,13 +194,21 @@ export default function RoomDetail() {
                     <div key={exp.id} className="group flex items-center justify-between py-4 gap-4 hover:bg-ink/5 dark:hover:bg-white/5 -mx-4 px-4 rounded-xl transition-colors">
                       <div className="flex items-center gap-4 min-w-0">
                         {exp.receiptUrl ? (
-                          <a href={receiptImageUrl(exp.receiptUrl)} target="_blank" rel="noreferrer" className="shrink-0 relative overflow-hidden rounded-xl border border-ink/10 dark:border-white/10 shadow-sm">
+                          <button
+                            type="button"
+                            onClick={() => setViewingReceipt({ url: exp.receiptUrl, title: exp.title })}
+                            className="shrink-0 relative overflow-hidden rounded-xl border border-ink/10 dark:border-white/10 shadow-sm cursor-pointer group/btn"
+                            title="Click to view bill image"
+                          >
                             <img
                               src={receiptImageUrl(exp.receiptUrl)}
                               alt="Receipt"
-                              className="w-12 h-12 object-cover hover:scale-110 transition-transform duration-300"
+                              className="w-12 h-12 object-cover group-hover/btn:scale-110 transition-transform duration-300"
                             />
-                          </a>
+                            <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover/btn:opacity-100 transition-opacity">
+                              <span className="text-white text-xs">📷</span>
+                            </div>
+                          </button>
                         ) : (
                           <div className="shrink-0 w-12 h-12 rounded-xl bg-ink/5 dark:bg-white/5 flex items-center justify-center border border-ink/5 dark:border-white/5">
                             <span className="font-mono text-xs text-ink/40 dark:text-white/40">{exp.category.slice(0, 2).toUpperCase()}</span>
@@ -216,6 +226,16 @@ export default function RoomDetail() {
                           <p className="text-xs text-ink/50 dark:text-white/40 mt-0.5">
                             {exp.category} · paid by <span className="font-medium text-ink/70 dark:text-white/70">{exp.paidBy.name}</span>
                           </p>
+                          {exp.receiptUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setViewingReceipt({ url: exp.receiptUrl, title: exp.title })}
+                              className="inline-flex items-center gap-1 text-[9px] font-mono uppercase tracking-wider bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400 px-2 py-0.5 rounded-full border border-sky-500/20 transition-all cursor-pointer mt-1"
+                              title="Click to view full receipt photo"
+                            >
+                              <span>📷 View Receipt</span>
+                            </button>
+                          )}
                         </div>
                       </div>
                       <div className="text-right shrink-0">
@@ -286,6 +306,14 @@ export default function RoomDetail() {
 
         </div>
       </main>
+
+      {viewingReceipt && (
+        <ReceiptModal
+          imageUrl={viewingReceipt.url}
+          title={viewingReceipt.title}
+          onClose={() => setViewingReceipt(null)}
+        />
+      )}
     </div>
   );
 }

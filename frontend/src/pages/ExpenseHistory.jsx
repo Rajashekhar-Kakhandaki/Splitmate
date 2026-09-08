@@ -5,6 +5,7 @@ import { formatRupees } from "../lib/format";
 import AppHeader from "../components/AppHeader.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import AddExpenseForm from "../components/AddExpenseForm.jsx";
+import ReceiptModal from "../components/ReceiptModal.jsx";
 import toast from "react-hot-toast";
 
 const inputCls = "mt-1.5 w-full rounded-xl border border-ink/15 dark:border-white/10 bg-white/50 dark:bg-black/20 text-ink dark:text-white px-4 py-2.5 text-sm outline-none focus:border-cover focus:ring-2 focus:ring-cover/20 transition-all backdrop-blur-sm";
@@ -19,6 +20,7 @@ export default function ExpenseHistory() {
   const [editingExpense, setEditingExpense] = useState(null);
   const [deletingExpense, setDeletingExpense] = useState(null);
   const [expandedSharesId, setExpandedSharesId] = useState(null);
+  const [viewingReceipt, setViewingReceipt] = useState(null);
 
   const [keyword, setKeyword] = useState("");
   const [from, setFrom] = useState("");
@@ -261,13 +263,21 @@ export default function ExpenseHistory() {
                       <div key={exp.id} className="group flex items-center justify-between py-5 gap-4 hover:bg-ink/5 dark:hover:bg-white/5 -mx-4 px-4 rounded-xl transition-colors">
                         <div className="flex items-center gap-4 min-w-0 flex-1">
                           {exp.receiptUrl ? (
-                            <a href={receiptImageUrl(exp.receiptUrl)} target="_blank" rel="noreferrer" className="shrink-0 relative overflow-hidden rounded-xl border border-ink/10 dark:border-white/10 shadow-sm">
+                            <button
+                              type="button"
+                              onClick={() => setViewingReceipt({ url: exp.receiptUrl, title: exp.title })}
+                              className="shrink-0 relative overflow-hidden rounded-xl border border-ink/10 dark:border-white/10 shadow-sm cursor-pointer group/btn"
+                              title="Click to view bill image"
+                            >
                               <img
                                 src={receiptImageUrl(exp.receiptUrl)}
                                 alt="Receipt"
-                                className="w-14 h-14 object-cover hover:scale-110 transition-transform duration-300"
+                                className="w-14 h-14 object-cover group-hover/btn:scale-110 transition-transform duration-300"
                               />
-                            </a>
+                              <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover/btn:opacity-100 transition-opacity">
+                                <span className="text-white text-xs">📷</span>
+                              </div>
+                            </button>
                           ) : (
                             <div className="shrink-0 w-14 h-14 rounded-xl bg-ink/5 dark:bg-white/5 flex items-center justify-center border border-ink/5 dark:border-white/5">
                               <span className="font-mono text-sm text-ink/40 dark:text-white/40">{exp.category.slice(0, 2).toUpperCase()}</span>
@@ -307,6 +317,16 @@ export default function ExpenseHistory() {
                             <p className="text-sm text-ink/60 dark:text-white/50 mt-0.5">
                               {exp.category} · paid by <span className="font-medium text-ink/80 dark:text-white/80">{exp.paidBy.name}</span>
                             </p>
+                            {exp.receiptUrl && (
+                              <button
+                                type="button"
+                                onClick={() => setViewingReceipt({ url: exp.receiptUrl, title: exp.title })}
+                                className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400 px-2.5 py-0.5 rounded-full border border-sky-500/20 transition-all cursor-pointer mt-1"
+                                title="Click to view full receipt photo"
+                              >
+                                <span>📷 View Receipt</span>
+                              </button>
+                            )}
                             {amountSubtitle && (
                               <p className="text-xs font-mono text-cover dark:text-gold mt-0.5">
                                 {amountSubtitle}
@@ -427,6 +447,14 @@ export default function ExpenseHistory() {
             </div>
           </div>
         </div>
+      )}
+
+      {viewingReceipt && (
+        <ReceiptModal
+          imageUrl={viewingReceipt.url}
+          title={viewingReceipt.title}
+          onClose={() => setViewingReceipt(null)}
+        />
       )}
     </div>
   );
