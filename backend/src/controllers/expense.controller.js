@@ -14,6 +14,7 @@ const CATEGORIES = [
   "Snacks",
   "Dining Out",
   "Furniture",
+  "Travel",
   "Other",
 ];
 

@@ -58,10 +58,14 @@ export default function AddExpenseForm({ room, currentUserId, onCreated, onClose
   // Determine initial split method based on incoming data if editing
   useEffect(() => {
     if (initialData?.shares && initialData.amount) {
-      // Check if it's equal
-      const isEqual = initialData.shares.every(s => Math.abs(s.shareAmount - (initialData.amount / initialData.shares.length)) < 0.1);
-      if (isEqual) setSplitMethod("equal");
-      else setSplitMethod("exact");
+      const payerId = initialData.paidBy?.id || initialData.paidBy;
+      if (initialData.shares.length === 1 && initialData.shares[0].memberId === payerId) {
+        setSplitMethod("personal");
+      } else {
+        const isEqual = initialData.shares.every(s => Math.abs(s.shareAmount - (initialData.amount / initialData.shares.length)) < 0.1);
+        if (isEqual) setSplitMethod("equal");
+        else setSplitMethod("exact");
+      }
     }
   }, [initialData]);
 
@@ -116,7 +120,11 @@ export default function AddExpenseForm({ room, currentUserId, onCreated, onClose
 
     let computedShares = [];
 
-    if (splitMethod === "equal") {
+    if (splitMethod === "personal") {
+      const targetPayerId = paidBy || currentUserId;
+      computedShares.push({ memberId: targetPayerId, shareAmount: numericAmount });
+    }
+    else if (splitMethod === "equal") {
       if (selectedMembers.length === 0) return setError("Select at least one member to split with.");
       const shareAmount = Math.round((numericAmount / selectedMembers.length) * 100) / 100;
       let sum = 0;
@@ -334,6 +342,7 @@ export default function AddExpenseForm({ room, currentUserId, onCreated, onClose
         <div className="flex flex-wrap gap-2 mt-3 mb-6 bg-ink/5 dark:bg-white/5 p-1 rounded-xl">
           {[
             { id: "equal", label: "Equally" },
+            { id: "personal", label: "Personal (Only Me)" },
             { id: "exact", label: "Exact Amounts" },
             { id: "percent", label: "Percentages" },
             { id: "shares", label: "By Shares" }
@@ -353,7 +362,17 @@ export default function AddExpenseForm({ room, currentUserId, onCreated, onClose
           ))}
         </div>
 
-        <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
+        {splitMethod === "personal" ? (
+          <div className="p-4 rounded-2xl border border-cover/20 bg-cover/5 dark:bg-cover/10 text-center backdrop-blur-sm">
+            <span className="inline-block text-[10px] font-mono uppercase tracking-widest text-cover dark:text-gold font-semibold bg-cover/10 dark:bg-gold/10 px-2.5 py-1 rounded-full border border-cover/20 dark:border-gold/20 mb-2">
+              Personal Expense
+            </span>
+            <p className="text-xs text-ink/70 dark:text-white/70 leading-relaxed">
+              This expense is 100% personal for <span className="font-semibold text-ink dark:text-white">{room.members.find(m => m.id === (paidBy || currentUserId))?.name || "you"}</span>. It won't be split with any other members and will remain private to you.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
           {room.members.map((m) => (
             <div key={m.id} className="flex items-center justify-between gap-4 p-3 rounded-xl border border-ink/5 dark:border-white/5 bg-white/40 dark:bg-white/5 backdrop-blur-sm">
               <span className="text-sm font-medium text-ink dark:text-white truncate">{m.name}</span>
@@ -424,6 +443,7 @@ export default function AddExpenseForm({ room, currentUserId, onCreated, onClose
             </div>
           ))}
         </div>
+        )}
       </div>
 
       <button

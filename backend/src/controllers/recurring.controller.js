@@ -3,7 +3,7 @@ const { calculateEqualShares } = require("../services/splitCalculator");
 
 const CATEGORIES = [
   "Rent", "Electricity", "Water", "WiFi", "Grocery",
-  "Kitchen", "Gas", "Cleaning", "Snacks", "Dining Out", "Furniture", "Other",
+  "Kitchen", "Gas", "Cleaning", "Snacks", "Dining Out", "Furniture", "Travel", "Other",
 ];
 
 /** Verify the user is a member of the room; throw a shaped error if not. */
