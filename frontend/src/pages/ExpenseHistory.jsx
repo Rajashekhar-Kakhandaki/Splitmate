@@ -144,7 +144,7 @@ export default function ExpenseHistory() {
         <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-start">
           
           {/* Left Column (Spans 4) - Filters */}
-          <div className="lg:col-span-4 flex flex-col gap-8 sticky top-8">
+          <div className="lg:col-span-4 flex flex-col gap-8 static lg:sticky lg:top-8 z-10 mb-4 lg:mb-0">
             <div className="bg-white/40 dark:bg-white/5 backdrop-blur-xl border border-ink/10 dark:border-white/10 rounded-[2rem] p-6 sm:p-8 shadow-sm">
               <p className="font-mono text-[10px] uppercase tracking-widest text-ink/50 dark:text-white/50 mb-6">
                 Search & Filters

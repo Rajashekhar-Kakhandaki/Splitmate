@@ -1,9 +1,9 @@
 import { useRef, useState } from "react";
-import api from "../lib/api";
+import api, { receiptImageUrl } from "../lib/api";
 
-export default function ReceiptScanner({ onScanned }) {
+export default function ReceiptScanner({ onScanned, initialReceiptUrl }) {
   const fileInputRef = useRef(null);
-  const [preview, setPreview] = useState(null);
+  const [preview, setPreview] = useState(() => (initialReceiptUrl ? receiptImageUrl(initialReceiptUrl) : null));
   const [status, setStatus] = useState("idle"); // idle | scanning | uploading | done | error
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
@@ -43,13 +43,13 @@ export default function ReceiptScanner({ onScanned }) {
     <div className="stitched rounded-2xl bg-white/50 dark:bg-dark-surface p-4">
       <div className="flex items-center justify-between">
         <p className="font-mono text-xs uppercase tracking-wide text-ink/50 dark:text-dark-ink-muted">
-          Scan a receipt (optional)
+          Receipt / Bill photo
         </p>
         {status !== "idle" && status !== "error" && (
           <span className="text-xs text-ink/40 dark:text-dark-ink-muted">
             {status === "scanning" && `Reading… ${Math.round(progress * 100)}%`}
             {status === "uploading" && "Saving photo…"}
-            {status === "done" && "Done — fields pre-filled below"}
+            {status === "done" && "Done — photo attached"}
           </span>
         )}
       </div>
@@ -82,7 +82,7 @@ export default function ReceiptScanner({ onScanned }) {
           disabled={status === "scanning" || status === "uploading"}
           className="text-xs font-mono uppercase tracking-wide border border-ink/20 dark:border-dark-border text-ink/60 dark:text-dark-ink-muted rounded-md px-3 py-2 hover:border-ink/40 dark:hover:border-dark-ink-muted transition-colors disabled:opacity-60"
         >
-          {preview ? "Retake / choose another" : "Take or choose photo"}
+          {preview ? "Retake / change photo" : "Take or choose photo"}
         </button>
       </div>
 

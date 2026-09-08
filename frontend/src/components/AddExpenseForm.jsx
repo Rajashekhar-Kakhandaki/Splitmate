@@ -237,7 +237,7 @@ export default function AddExpenseForm({ room, currentUserId, onCreated, onClose
         </p>
       )}
 
-      {!isEditing && <ReceiptScanner onScanned={handleScanned} />}
+      <ReceiptScanner onScanned={handleScanned} initialReceiptUrl={initialData?.receiptUrl} />
       
       <div className="grid sm:grid-cols-2 gap-5">
         <label className="block">
