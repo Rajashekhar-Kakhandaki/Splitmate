@@ -244,6 +244,7 @@ export default function ExpenseHistory() {
                     const selectedMemberShare = payer ? exp.shares?.find((s) => s.memberId === payer) : null;
                     const isSelectedMemberPayer = payer ? exp.paidBy.id === payer : true;
                     const isIndividual = exp.shares && exp.shares.length === 1;
+                    const isSelective = exp.shares && exp.shares.length > 1 && room?.members && exp.shares.length < room.members.length;
 
                     let displayAmount = exp.amount;
                     let amountSubtitle = null;
@@ -276,6 +277,11 @@ export default function ExpenseHistory() {
                               {isIndividual && (
                                 <span className="shrink-0 text-[10px] font-mono uppercase tracking-wider bg-cover/10 text-cover dark:text-gold dark:bg-gold/10 px-2 py-0.5 rounded-full border border-cover/20 dark:border-gold/20">
                                   Personal
+                                </span>
+                              )}
+                              {isSelective && (
+                                <span className="shrink-0 text-[10px] font-mono uppercase tracking-wider bg-purple-500/10 text-purple-600 dark:text-purple-400 px-2 py-0.5 rounded-full border border-purple-500/20">
+                                  {exp.shares.length} Members
                                 </span>
                               )}
                             </div>

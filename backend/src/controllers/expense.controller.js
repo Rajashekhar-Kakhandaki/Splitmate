@@ -182,11 +182,9 @@ async function listExpenses(req, res, next) {
       },
     });
 
-    // Filter out individual expenses belonging to other members.
-    // Shared expenses (shares.length > 1) are visible to all members.
-    // Individual expenses (shares.length === 1) are visible ONLY to the member in that share.
+    // Only show expenses to members involved in the expense (payer or share participant) for privacy.
     const visibleExpenses = expenses.filter((e) =>
-      e.shares.length > 1 || (e.shares.length === 1 && e.shares.some((s) => s.memberId === req.user.id))
+      e.paidBy === req.user.id || e.shares.some((s) => s.memberId === req.user.id)
     );
 
     res.json({ expenses: visibleExpenses.map(serializeExpense) });
@@ -294,9 +292,9 @@ async function getDashboard(req, res, next) {
       return { day, total: round2(total) };
     });
 
-    // Filter recent expenses visible to current user (shared + user's own individual)
+    // Filter recent expenses visible to current user (only expenses where user is payer or share member)
     const visibleRecentExpenses = allExpenses.filter((e) =>
-      e.shares.length > 1 || (e.shares.length === 1 && e.shares.some((s) => s.memberId === req.user.id))
+      e.paidBy === req.user.id || e.shares.some((s) => s.memberId === req.user.id)
     );
 
     res.json({
