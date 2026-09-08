@@ -18,6 +18,7 @@ export default function ExpenseHistory() {
   const [error, setError] = useState("");
   const [editingExpense, setEditingExpense] = useState(null);
   const [deletingExpense, setDeletingExpense] = useState(null);
+  const [expandedSharesId, setExpandedSharesId] = useState(null);
 
   const [keyword, setKeyword] = useState("");
   const [from, setFrom] = useState("");
@@ -245,6 +246,7 @@ export default function ExpenseHistory() {
                     const isSelectedMemberPayer = payer ? exp.paidBy.id === payer : true;
                     const isIndividual = exp.shares && exp.shares.length === 1;
                     const isSelective = exp.shares && exp.shares.length > 1 && room?.members && exp.shares.length < room.members.length;
+                    const isExpanded = expandedSharesId === exp.id;
 
                     let displayAmount = exp.amount;
                     let amountSubtitle = null;
@@ -257,7 +259,7 @@ export default function ExpenseHistory() {
 
                     return (
                       <div key={exp.id} className="group flex items-center justify-between py-5 gap-4 hover:bg-ink/5 dark:hover:bg-white/5 -mx-4 px-4 rounded-xl transition-colors">
-                        <div className="flex items-center gap-4 min-w-0">
+                        <div className="flex items-center gap-4 min-w-0 flex-1">
                           {exp.receiptUrl ? (
                             <a href={receiptImageUrl(exp.receiptUrl)} target="_blank" rel="noreferrer" className="shrink-0 relative overflow-hidden rounded-xl border border-ink/10 dark:border-white/10 shadow-sm">
                               <img
@@ -271,8 +273,8 @@ export default function ExpenseHistory() {
                               <span className="font-mono text-sm text-ink/40 dark:text-white/40">{exp.category.slice(0, 2).toUpperCase()}</span>
                             </div>
                           )}
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
                               <p className="text-lg font-medium truncate text-ink dark:text-white">{exp.title}</p>
                               {isIndividual && (
                                 <span className="shrink-0 text-[10px] font-mono uppercase tracking-wider bg-cover/10 text-cover dark:text-gold dark:bg-gold/10 px-2 py-0.5 rounded-full border border-cover/20 dark:border-gold/20">
@@ -280,9 +282,26 @@ export default function ExpenseHistory() {
                                 </span>
                               )}
                               {isSelective && (
-                                <span className="shrink-0 text-[10px] font-mono uppercase tracking-wider bg-purple-500/10 text-purple-600 dark:text-purple-400 px-2 py-0.5 rounded-full border border-purple-500/20">
-                                  {exp.shares.length} Members
-                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedSharesId(isExpanded ? null : exp.id)}
+                                  className="shrink-0 text-[10px] font-mono uppercase tracking-wider bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 px-2.5 py-0.5 rounded-full border border-purple-500/20 transition-all flex items-center gap-1 cursor-pointer"
+                                  title="Click to view split members"
+                                >
+                                  <span>{exp.shares.length} Members</span>
+                                  <span className="text-[8px]">{isExpanded ? "▲" : "▼"}</span>
+                                </button>
+                              )}
+                              {!isIndividual && !isSelective && exp.shares?.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedSharesId(isExpanded ? null : exp.id)}
+                                  className="shrink-0 text-[10px] font-mono uppercase tracking-wider bg-ink/5 hover:bg-ink/10 dark:bg-white/10 dark:hover:bg-white/15 text-ink/70 dark:text-white/70 px-2 py-0.5 rounded-full border border-ink/10 dark:border-white/10 transition-all flex items-center gap-1 cursor-pointer"
+                                  title="Click to view split members"
+                                >
+                                  <span>All Members</span>
+                                  <span className="text-[8px]">{isExpanded ? "▲" : "▼"}</span>
+                                </button>
                               )}
                             </div>
                             <p className="text-sm text-ink/60 dark:text-white/50 mt-0.5">
@@ -293,6 +312,23 @@ export default function ExpenseHistory() {
                                 {amountSubtitle}
                               </p>
                             )}
+
+                            {isExpanded && exp.shares && (
+                              <div className="mt-3 p-3 bg-purple-500/10 dark:bg-purple-500/15 border border-purple-500/20 rounded-xl text-xs space-y-1.5 animate-fade-in">
+                                <p className="font-mono text-[10px] uppercase tracking-widest text-purple-700 dark:text-purple-300 font-semibold">
+                                  Split Members ({exp.shares.length}):
+                                </p>
+                                <div className="flex flex-wrap gap-2 pt-1">
+                                  {exp.shares.map((s) => (
+                                    <span key={s.memberId} className="bg-white/80 dark:bg-black/50 text-ink dark:text-white px-2.5 py-1 rounded-lg border border-ink/10 dark:border-white/10 font-mono text-[11px] flex items-center gap-1.5 shadow-sm">
+                                      <span className="font-medium">{s.name}</span>
+                                      <span className="text-ink/50 dark:text-white/50">({formatRupees(s.shareAmount)})</span>
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
                             {exp.note && (
                               <p className="text-xs text-ink/40 dark:text-white/40 mt-1 line-clamp-1 italic">
                                 "{exp.note}"
