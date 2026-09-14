@@ -146,18 +146,44 @@ export default function SettleUp({ roomId, currentUserId, onSettled, refreshTrig
     const phone = s.fromPhoneNumber ? s.fromPhoneNumber.replace(/[^0-9]/g, "") : "";
     const myUpi = s.toUpiId ? s.toUpiId.trim() : "";
     
-    let msg = `Hi ${s.fromName}, friendly reminder from SplitMate! 💸\n`;
-    msg += `You owe ₹${amountFormatted} to ${s.toName}.\n`;
+    let msg = s.isOverdue
+      ? `⏰ URGENT OVERDUE NOTICE: Hi ${s.fromName},\n`
+      : `Hi ${s.fromName}, friendly reminder from SplitMate! 💸\n`;
+      
+    if (s.isOverdue) {
+      msg += `Your debt of ₹${amountFormatted} owed to ${s.toName} is now MORE THAN 7 DAYS OVERDUE.\n`;
+    } else {
+      msg += `You owe ₹${amountFormatted} to ${s.toName}.\n`;
+    }
+
     if (myUpi) {
       msg += `Pay via UPI ID: ${myUpi}\n`;
       msg += `Direct UPI Link: upi://pay?pa=${encodeURIComponent(myUpi)}&pn=${encodeURIComponent(s.toName)}&am=${amountFormatted}&cu=INR\n`;
     }
-    msg += `Please settle up when you get a chance. Thanks!`;
+    msg += `Please settle up as soon as possible. Thanks!`;
 
     const encodedMsg = encodeURIComponent(msg);
     const waUrl = phone ? `https://wa.me/${phone}?text=${encodedMsg}` : `https://wa.me/?text=${encodedMsg}`;
     window.open(waUrl, "_blank");
   }
+
+  // Trigger browser notification for 7-day overdue debts directed at logged-in creditor
+  useEffect(() => {
+    if (!suggestions) return;
+    const overdueForMe = suggestions.filter(s => s.to === currentUserId && s.isOverdue);
+    
+    if ("Notification" in window && Notification.permission === "granted") {
+      overdueForMe.forEach(s => {
+        const seenKey = `seen_overdue_wa_${s.from}_${s.to}`;
+        if (!sessionStorage.getItem(seenKey)) {
+          new Notification("⏰ 7-Day Overdue Debt Notice", {
+            body: `${s.fromName} owes you ${formatRupees(s.amount)} (7+ days overdue). Tap to send 1-click WhatsApp reminder.`,
+          });
+          sessionStorage.setItem(seenKey, "true");
+        }
+      });
+    }
+  }, [suggestions, currentUserId]);
 
   // Automatic return detector: when returning from UPI app (Google Pay/PhonePe), notify & highlight status check
   useEffect(() => {
@@ -227,6 +253,29 @@ export default function SettleUp({ roomId, currentUserId, onSettled, refreshTrig
           </div>
         </div>
       )}
+
+      {/* 7-Day Overdue WhatsApp Action Banner */}
+      {suggestions?.filter(s => s.to === currentUserId && s.isOverdue).map(s => (
+        <div key={`overdue-wa-${s.from}`} className="mb-5 p-4 bg-gradient-to-r from-owe/15 via-rose-500/10 to-owe/15 border-2 border-owe/40 rounded-2xl animate-fade-in shadow-md">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-mono text-[10px] uppercase tracking-widest text-owe dark:text-red-400 font-bold flex items-center gap-1.5">
+              ⏰ 7-Day Overdue Debt Notice
+            </span>
+            <span className="text-[9px] font-mono uppercase bg-owe/20 text-owe dark:text-red-300 px-2 py-0.5 rounded-full font-bold">
+              Urgent Action
+            </span>
+          </div>
+          <p className="text-xs text-ink/90 dark:text-white/90 mb-3 leading-relaxed">
+            <span className="font-semibold text-owe dark:text-red-400">{s.fromName}</span> owes you <span className="font-mono font-bold">{formatRupees(s.amount)}</span> which is <span className="font-semibold underline">more than 7 days overdue</span>. Send an automated 1-click WhatsApp follow-up notice now.
+          </p>
+          <button
+            onClick={() => sendWhatsAppReminder(s)}
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-mono text-[11px] uppercase tracking-wider py-2.5 px-4 rounded-xl font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <span>💬 Send Overdue WhatsApp Follow-up</span>
+          </button>
+        </div>
+      ))}
 
       {/* Receiver Alert Banner */}
       {pendingSettlements.filter(p => p.receiver === currentUserId).map(p => (
