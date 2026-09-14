@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../lib/api";
 import { formatRupees } from "../lib/format";
 import Avatar from "./Avatar.jsx";
+import toast from "react-hot-toast";
 
 export default function SettleUp({ roomId, currentUserId, onSettled, refreshTrigger }) {
   const [suggestions, setSuggestions] = useState(null);
@@ -9,7 +10,9 @@ export default function SettleUp({ roomId, currentUserId, onSettled, refreshTrig
   const [error, setError] = useState("");
   const [settlingKey, setSettlingKey] = useState(null);
   const [notifyingKey, setNotifyingKey] = useState(null);
+  const [cancellingId, setCancellingId] = useState(null);
   const [customAmounts, setCustomAmounts] = useState({});
+  const [upiConfirmPayment, setUpiConfirmPayment] = useState(null);
 
   async function refresh() {
     const res = await api.get(`/rooms/${roomId}/settlements/suggestions`);
@@ -69,8 +72,6 @@ export default function SettleUp({ roomId, currentUserId, onSettled, refreshTrig
     }
   }
 
-  const [upiConfirmPayment, setUpiConfirmPayment] = useState(null);
-
   async function notifyPaid(s, paymentMethod) {
     const key = `${s.from}-${s.to}`;
     const amountToPay = Number(customAmounts[key] !== undefined ? customAmounts[key] : s.amount) || s.amount;
@@ -89,6 +90,21 @@ export default function SettleUp({ roomId, currentUserId, onSettled, refreshTrig
       setError(err.response?.data?.error || "Couldn't send notification.");
     } finally {
       setNotifyingKey(null);
+    }
+  }
+
+  async function cancelPendingSettlement(pendingId, isSender = false) {
+    setCancellingId(pendingId);
+    setError("");
+    try {
+      await api.delete(`/rooms/${roomId}/settlements/pending/${pendingId}`);
+      toast.success(isSender ? "Payment notification taken back." : "Marked as not received.");
+      await refresh();
+      onSettled?.();
+    } catch (err) {
+      setError(err.response?.data?.error || "Couldn't cancel notification.");
+    } finally {
+      setCancellingId(null);
     }
   }
 
@@ -179,18 +195,28 @@ export default function SettleUp({ roomId, currentUserId, onSettled, refreshTrig
               <span className="font-mono font-medium">{formatRupees(p.amount)}</span>. 
             </p>
           </div>
-          <div className="pl-[2.25rem] flex items-center justify-between gap-4">
+          <div className="pl-[2.25rem] flex flex-wrap items-center justify-between gap-3">
             <div className="text-xs text-ink/70 dark:text-white/60">
               <span className="font-medium">Method:</span> {p.paymentMethod || "Other"}<br/>
               Check your account to confirm.
             </div>
-            <button
-              onClick={() => markSettled({ from: p.payer, to: p.receiver, amount: p.amount, customAmount: p.amount })}
-              disabled={settlingKey === `${p.payer}-${p.receiver}`}
-              className="text-xs font-mono uppercase tracking-widest bg-cover text-paper rounded-lg px-4 py-2 hover:bg-cover-light transition-all shadow-md disabled:opacity-50 shrink-0"
-            >
-              {settlingKey === `${p.payer}-${p.receiver}` ? "..." : "Confirm"}
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => cancelPendingSettlement(p.id, false)}
+                disabled={cancellingId === p.id}
+                className="text-xs font-mono uppercase tracking-widest bg-owe/10 hover:bg-owe/20 text-owe border border-owe/30 rounded-lg px-3 py-2 transition-all cursor-pointer disabled:opacity-50"
+                title="Decline if money was not received in your account"
+              >
+                {cancellingId === p.id ? "..." : "Not Received"}
+              </button>
+              <button
+                onClick={() => markSettled({ from: p.payer, to: p.receiver, amount: p.amount, customAmount: p.amount })}
+                disabled={settlingKey === `${p.payer}-${p.receiver}`}
+                className="text-xs font-mono uppercase tracking-widest bg-cover text-paper rounded-lg px-4 py-2 hover:bg-cover-light transition-all shadow-md disabled:opacity-50"
+              >
+                {settlingKey === `${p.payer}-${p.receiver}` ? "..." : "Confirm"}
+              </button>
+            </div>
           </div>
         </div>
       ))}
@@ -206,6 +232,8 @@ export default function SettleUp({ roomId, currentUserId, onSettled, refreshTrig
           const iAmPayer    = s.from === currentUserId; // I owe money → I can mark settled
           const iAmReceiver = s.to   === currentUserId; // someone owes me
           const involvesMe  = iAmPayer || iAmReceiver;
+
+          const pendingNotice = pendingSettlements.find((p) => p.payer === s.from && p.receiver === s.to);
 
           return (
             <div
@@ -271,10 +299,21 @@ export default function SettleUp({ roomId, currentUserId, onSettled, refreshTrig
                       {settlingKey === key ? "…" : "Mark settled"}
                     </button>
                   ) : iAmPayer ? (
-                    pendingSettlements.some((p) => p.payer === s.from && p.receiver === s.to) ? (
-                      <span className="text-[10px] font-mono uppercase tracking-widest text-cover dark:text-gold border border-cover/20 dark:border-gold/20 bg-cover/5 dark:bg-gold/5 rounded-lg px-4 py-2.5 text-center w-full sm:w-auto">
-                        Notification sent
-                      </span>
+                    pendingNotice ? (
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-cover dark:text-gold border border-cover/20 dark:border-gold/20 bg-cover/5 dark:bg-gold/5 rounded-lg px-3 py-2 text-center">
+                          Notification sent
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => cancelPendingSettlement(pendingNotice.id, true)}
+                          disabled={cancellingId === pendingNotice.id}
+                          className="text-[10px] font-mono uppercase tracking-widest text-owe hover:bg-owe/10 border border-owe/30 rounded-lg px-3 py-2 transition-all cursor-pointer disabled:opacity-50"
+                          title="Recall/take back mistaken payment notification"
+                        >
+                          {cancellingId === pendingNotice.id ? "..." : "Take Back"}
+                        </button>
+                      </div>
                     ) : (
                       <div className="flex items-center gap-2 w-full sm:w-auto">
                         <button

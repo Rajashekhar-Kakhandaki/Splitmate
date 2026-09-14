@@ -189,10 +189,47 @@ async function createSettlement(req, res, next) {
   }
 }
 
+// DELETE /api/rooms/:id/settlements/pending/:settlementId
+// Allows sender (payer) to "Take Back" a pending notification sent by mistake,
+// or receiver to decline ("Not Received").
+async function deletePendingSettlement(req, res, next) {
+  try {
+    const { id: roomId, settlementId } = req.params;
+    await loadMembership(roomId, req.user.id);
+
+    const existing = await prisma.settlement.findUnique({
+      where: { id: settlementId },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: "Pending settlement not found." });
+    }
+
+    if (existing.status !== "pending") {
+      return res.status(400).json({ error: "Only pending settlements can be cancelled or declined." });
+    }
+
+    // Only sender (payer) or receiver can cancel/decline this pending settlement
+    if (existing.payer !== req.user.id && existing.receiver !== req.user.id) {
+      return res.status(403).json({ error: "You are not authorized to cancel this notification." });
+    }
+
+    await prisma.settlement.delete({
+      where: { id: settlementId },
+    });
+
+    const actionType = existing.payer === req.user.id ? "recalled" : "declined";
+    res.json({ success: true, message: `Pending notification ${actionType}.` });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   getSuggestions,
   listSettlements,
   createSettlement,
+  deletePendingSettlement,
   getBalancesAndSuggestions,
   loadMembership,
 };

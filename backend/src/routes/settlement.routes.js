@@ -5,6 +5,7 @@ const {
   getSuggestions,
   listSettlements,
   createSettlement,
+  deletePendingSettlement,
 } = require("../controllers/settlement.controller");
 
 // mergeParams lets this router read :id from the parent /api/rooms/:id mount
@@ -33,5 +34,7 @@ router.post(
   validate,
   createSettlement
 );
+
+router.delete("/pending/:settlementId", deletePendingSettlement);
 
 module.exports = router;
