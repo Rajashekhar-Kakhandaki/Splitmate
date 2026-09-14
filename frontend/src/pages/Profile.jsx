@@ -13,6 +13,7 @@ export default function Profile() {
   
   const [name, setName] = useState(user?.name || "");
   const [email, setEmail] = useState(user?.email || "");
+  const [upiId, setUpiId] = useState(user?.upiId || "");
   const [savingInfo, setSavingInfo] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState("");
@@ -27,7 +28,7 @@ export default function Profile() {
     e.preventDefault();
     setSavingInfo(true);
     try {
-      const res = await api.put("/user/profile", { name, email });
+      const res = await api.put("/user/profile", { name, email, upiId });
       updateUser(res.data.user);
       toast.success("Profile updated successfully");
     } catch (err) {
@@ -179,6 +180,20 @@ export default function Profile() {
                   onChange={(e) => setEmail(e.target.value)}
                   className={inputCls}
                 />
+              </label>
+
+              <label className="block">
+                <span className={labelCls}>UPI ID / VPA (Optional)</span>
+                <input
+                  type="text"
+                  value={upiId}
+                  onChange={(e) => setUpiId(e.target.value)}
+                  placeholder="e.g. name@okicici or 9876543210@ybl"
+                  className={inputCls}
+                />
+                <span className="text-[10px] text-ink/40 dark:text-white/40 block mt-1">
+                  Roommates can pay you directly via Google Pay, PhonePe, or Paytm in 1 click.
+                </span>
               </label>
 
               <div className="pt-2">

@@ -29,6 +29,7 @@ model User {
   email        String   @unique
   passwordHash     String    @map("password")
   avatarUrl        String?   @map("avatar_url")
+  upiId            String?   @map("upi_id")
   resetToken       String?   @map("reset_token")
   resetTokenExpiry DateTime? @map("reset_token_expiry")
   createdAt        DateTime  @default(now())

@@ -33,7 +33,7 @@ async function getBalancesAndSuggestions(roomId) {
     }),
     prisma.roomMember.findMany({
       where: { roomId },
-      include: { user: { select: { id: true, name: true } } },
+      include: { user: { select: { id: true, name: true, upiId: true } } },
     }),
   ]);
 
@@ -64,6 +64,7 @@ async function getBalancesAndSuggestions(roomId) {
   const suggestions = simplifyDebts(netBalances);
 
   const nameById = Object.fromEntries(members.map((m) => [m.user.id, m.user.name]));
+  const upiById = Object.fromEntries(members.map((m) => [m.user.id, m.user.upiId]));
 
   return {
     netBalances,
@@ -71,6 +72,7 @@ async function getBalancesAndSuggestions(roomId) {
       ...s,
       fromName: nameById[s.from] || "Unknown",
       toName: nameById[s.to] || "Unknown",
+      toUpiId: upiById[s.to] || null,
     })),
     pendingSettlements: pendingSettlements.map((s) => ({
       ...s,

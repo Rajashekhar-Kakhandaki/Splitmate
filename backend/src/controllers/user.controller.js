@@ -6,7 +6,7 @@ const SALT_ROUNDS = 10;
 // PUT /api/user/profile
 async function updateProfile(req, res, next) {
   try {
-    const { name, email, avatarUrl } = req.body;
+    const { name, email, avatarUrl, upiId } = req.body;
     const updateData = {};
 
     if (name) updateData.name = name;
@@ -23,10 +23,14 @@ async function updateProfile(req, res, next) {
       updateData.avatarUrl = avatarUrl;
     }
 
+    if (upiId !== undefined) {
+      updateData.upiId = upiId ? upiId.trim() : null;
+    }
+
     const updatedUser = await prisma.user.update({
       where: { id: req.user.id },
       data: updateData,
-      select: { id: true, name: true, email: true, avatarUrl: true, createdAt: true },
+      select: { id: true, name: true, email: true, avatarUrl: true, upiId: true, createdAt: true },
     });
 
     res.json({ user: updatedUser });

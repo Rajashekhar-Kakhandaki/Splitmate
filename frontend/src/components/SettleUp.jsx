@@ -90,6 +90,25 @@ export default function SettleUp({ roomId, currentUserId, onSettled, refreshTrig
     }
   }
 
+  async function payViaUpi(s) {
+    const key = `${s.from}-${s.to}`;
+    const amountToPay = Number(customAmounts[key] !== undefined ? customAmounts[key] : s.amount) || s.amount;
+
+    const upiId = s.toUpiId ? s.toUpiId.trim() : "";
+    const payeeName = encodeURIComponent(s.toName || "Member");
+    const note = encodeURIComponent(`SplitMate settlement to ${s.toName}`);
+
+    const upiUrl = upiId
+      ? `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${payeeName}&am=${amountToPay.toFixed(2)}&tn=${note}&cu=INR`
+      : `upi://pay?pn=${payeeName}&am=${amountToPay.toFixed(2)}&tn=${note}&cu=INR`;
+
+    // Trigger native UPI app (Google Pay, PhonePe, Paytm, BHIM) intent launcher
+    window.location.href = upiUrl;
+
+    // Record pending settlement notification
+    await notifyPaid(s, "UPI");
+  }
+
   if (suggestions === null && !error) {
     return <p className="font-mono text-xs text-ink/40 dark:text-dark-ink-muted">loading settle up…</p>;
   }
@@ -162,7 +181,7 @@ export default function SettleUp({ roomId, currentUserId, onSettled, refreshTrig
                   <Avatar name={s.fromName} size="sm" />
                   <Avatar name={s.toName} size="sm" />
                 </div>
-                <div className="truncate">
+                <div className="truncate flex-1">
                   <span className={`font-medium ${iAmPayer ? "text-owe" : "text-ink/80 dark:text-white/80"}`}>
                     {iAmPayer ? "You" : s.fromName}
                   </span>
@@ -170,6 +189,11 @@ export default function SettleUp({ roomId, currentUserId, onSettled, refreshTrig
                   <span className={`font-medium ${iAmReceiver ? "text-owed" : "text-ink/80 dark:text-white/80"}`}>
                     {iAmReceiver ? "You" : s.toName}
                   </span>
+                  {s.toUpiId && (
+                    <span className="ml-2 text-[10px] font-mono bg-ink/5 dark:bg-white/10 px-2 py-0.5 rounded text-ink/60 dark:text-white/60">
+                      {s.toUpiId}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -213,16 +237,17 @@ export default function SettleUp({ roomId, currentUserId, onSettled, refreshTrig
                     ) : (
                       <div className="flex items-center gap-2 w-full sm:w-auto">
                         <button
-                          onClick={() => notifyPaid(s, "UPI")}
+                          onClick={() => payViaUpi(s)}
                           disabled={notifyingKey === key}
-                          className="flex-1 sm:flex-none text-[10px] font-mono uppercase tracking-widest bg-ink/5 dark:bg-white/5 border border-ink/10 dark:border-white/10 text-ink dark:text-white rounded-lg px-3 py-2.5 hover:bg-ink/10 dark:hover:bg-white/10 transition-colors disabled:opacity-60"
+                          className="flex-1 sm:flex-none text-[10px] font-mono uppercase tracking-widest bg-cover text-white rounded-lg px-3.5 py-2.5 hover:bg-cover-light transition-all shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-60 font-semibold cursor-pointer"
+                          title={s.toUpiId ? `Pay ${s.toUpiId} via Google Pay / PhonePe / Paytm` : `Pay ${s.toName} via UPI app`}
                         >
-                          {notifyingKey === key ? "…" : "UPI"}
+                          <span>⚡ Pay via UPI</span>
                         </button>
                         <button
                           onClick={() => notifyPaid(s, "Cash")}
                           disabled={notifyingKey === key}
-                          className="flex-1 sm:flex-none text-[10px] font-mono uppercase tracking-widest bg-ink/5 dark:bg-white/5 border border-ink/10 dark:border-white/10 text-ink dark:text-white rounded-lg px-3 py-2.5 hover:bg-ink/10 dark:hover:bg-white/10 transition-colors disabled:opacity-60"
+                          className="flex-1 sm:flex-none text-[10px] font-mono uppercase tracking-widest bg-ink/5 dark:bg-white/5 border border-ink/10 dark:border-white/10 text-ink dark:text-white rounded-lg px-3 py-2.5 hover:bg-ink/10 dark:hover:bg-white/10 transition-colors disabled:opacity-60 cursor-pointer"
                         >
                           {notifyingKey === key ? "…" : "Cash"}
                         </button>
