@@ -69,6 +69,8 @@ export default function SettleUp({ roomId, currentUserId, onSettled, refreshTrig
     }
   }
 
+  const [upiConfirmPayment, setUpiConfirmPayment] = useState(null);
+
   async function notifyPaid(s, paymentMethod) {
     const key = `${s.from}-${s.to}`;
     const amountToPay = Number(customAmounts[key] !== undefined ? customAmounts[key] : s.amount) || s.amount;
@@ -90,7 +92,7 @@ export default function SettleUp({ roomId, currentUserId, onSettled, refreshTrig
     }
   }
 
-  async function payViaUpi(s) {
+  function payViaUpi(s) {
     const key = `${s.from}-${s.to}`;
     const amountToPay = Number(customAmounts[key] !== undefined ? customAmounts[key] : s.amount) || s.amount;
 
@@ -105,8 +107,19 @@ export default function SettleUp({ roomId, currentUserId, onSettled, refreshTrig
     // Trigger native UPI app (Google Pay, PhonePe, Paytm, BHIM) intent launcher
     window.location.href = upiUrl;
 
-    // Record pending settlement notification
-    await notifyPaid(s, "UPI");
+    // Show confirmation banner upon returning to SplitMate
+    setUpiConfirmPayment({ suggestion: s, amountToPay });
+  }
+
+  async function confirmUpiSent() {
+    if (!upiConfirmPayment) return;
+    const { suggestion } = upiConfirmPayment;
+    setUpiConfirmPayment(null);
+    await notifyPaid(suggestion, "UPI");
+  }
+
+  function cancelUpiSent() {
+    setUpiConfirmPayment(null);
   }
 
   if (suggestions === null && !error) {
@@ -126,6 +139,34 @@ export default function SettleUp({ roomId, currentUserId, onSettled, refreshTrig
         <p className="text-sm text-owe bg-owe/10 border border-owe/30 rounded-lg px-3 py-2 mb-4">
           {error}
         </p>
+      )}
+
+      {/* UPI Post-Launch Confirmation Banner */}
+      {upiConfirmPayment && (
+        <div className="mb-5 p-4 bg-cover/10 border border-cover/30 rounded-2xl animate-fade-in shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-mono text-[10px] uppercase tracking-widest text-cover dark:text-gold font-bold">
+              ⚡ UPI Payment Confirmation
+            </span>
+          </div>
+          <p className="text-xs text-ink/80 dark:text-white/80 mb-3">
+            Did your payment of <span className="font-mono font-bold">{formatRupees(upiConfirmPayment.amountToPay)}</span> to <span className="font-semibold">{upiConfirmPayment.suggestion.toName}</span> succeed in your UPI app?
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={confirmUpiSent}
+              className="flex-1 bg-cover text-white font-mono text-[10px] uppercase tracking-wider py-2 px-3 rounded-xl font-semibold shadow-sm hover:bg-cover-light transition-all cursor-pointer"
+            >
+              Yes, Payment Sent
+            </button>
+            <button
+              onClick={cancelUpiSent}
+              className="flex-1 bg-ink/5 dark:bg-white/10 text-ink/70 dark:text-white/70 font-mono text-[10px] uppercase tracking-wider py-2 px-3 rounded-xl hover:bg-ink/10 dark:hover:bg-white/20 transition-all cursor-pointer"
+            >
+              No, Cancelled
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Receiver Alert Banner */}
