@@ -272,6 +272,10 @@ export default function ExpenseHistory() {
                               <img
                                 src={receiptImageUrl(exp.receiptUrl)}
                                 alt="Receipt"
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.style.display = "none";
+                                }}
                                 className="w-14 h-14 object-cover group-hover/btn:scale-110 transition-transform duration-300"
                               />
                               <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover/btn:opacity-100 transition-opacity">
@@ -280,7 +284,7 @@ export default function ExpenseHistory() {
                             </button>
                           ) : (
                             <div className="shrink-0 w-14 h-14 rounded-xl bg-ink/5 dark:bg-white/5 flex items-center justify-center border border-ink/5 dark:border-white/5">
-                              <span className="font-mono text-sm text-ink/40 dark:text-white/40">{exp.category.slice(0, 2).toUpperCase()}</span>
+                              <span className="font-mono text-sm text-ink/40 dark:text-white/40">{exp.category ? exp.category.slice(0, 2).toUpperCase() : "EX"}</span>
                             </div>
                           )}
                           <div className="min-w-0 flex-1">
@@ -315,7 +319,7 @@ export default function ExpenseHistory() {
                               )}
                             </div>
                             <p className="text-sm text-ink/60 dark:text-white/50 mt-0.5">
-                              {exp.category} · paid by <span className="font-medium text-ink/80 dark:text-white/80">{exp.paidBy.name}</span>
+                              {exp.category} · paid by <span className="font-medium text-ink/80 dark:text-white/80">{exp.paidBy?.name || exp.paidBy || "Member"}</span>
                             </p>
                             {exp.receiptUrl && (
                               <button

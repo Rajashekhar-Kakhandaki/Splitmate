@@ -1,3 +1,5 @@
+import { createWorker } from "tesseract.js";
+
 /**
  * Downscales an input image File to a max dimension (default 1000px) using an HTML Canvas.
  * This prevents WebAssembly out-of-memory crashes when processing multi-megapixel photos on mobile.
@@ -97,6 +99,7 @@ export async function scanReceipt(file, onProgress) {
  * the text (receipts almost always show the total as the biggest number).
  */
 export function guessTotalAmount(text) {
+  if (!text || typeof text !== "string") return null;
   const lines = text.split("\n");
   const totalKeywords = /\b(total|grand total|amount due|net amount|net payable|to pay)\b/i;
 
@@ -128,6 +131,7 @@ function extractAmount(line) {
  * near the top of the receipt — usually the store/vendor name.
  */
 export function guessTitle(text) {
+  if (!text || typeof text !== "string") return null;
   const lines = text
     .split("\n")
     .map((l) => l.trim())

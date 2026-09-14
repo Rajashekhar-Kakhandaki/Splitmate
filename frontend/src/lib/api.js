@@ -19,15 +19,23 @@ api.interceptors.request.use((config) => {
 // /api), so build the absolute URL from whatever the browser already
 // returned as a relative path (e.g. "/uploads/receipts/abc.jpg").
 export function receiptImageUrl(relativeUrl) {
-  if (!relativeUrl) return null;
-  
-  // If it's already an absolute URL (like Cloudinary), return it directly
-  if (relativeUrl.startsWith("http")) {
-    return relativeUrl;
+  if (!relativeUrl || typeof relativeUrl !== "string") return null;
+
+  const trimmed = relativeUrl.trim();
+
+  // If it's already an absolute URL (like Cloudinary, blob, data), return it directly
+  if (
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("blob:") ||
+    trimmed.startsWith("data:")
+  ) {
+    return trimmed;
   }
-  
+
+  const cleanPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
   const origin = API_URL.replace(/\/api\/?$/, "");
-  return `${origin}${relativeUrl}`;
+  return `${origin}${cleanPath}`;
 }
 
 export default api;

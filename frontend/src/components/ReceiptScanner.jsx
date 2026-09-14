@@ -9,9 +9,7 @@ export default function ReceiptScanner({ onScanned, initialReceiptUrl }) {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (initialReceiptUrl) {
-      setPreview(receiptImageUrl(initialReceiptUrl));
-    }
+    setPreview(initialReceiptUrl ? receiptImageUrl(initialReceiptUrl) : null);
   }, [initialReceiptUrl]);
 
   async function handleFile(file) {
@@ -41,6 +39,10 @@ export default function ReceiptScanner({ onScanned, initialReceiptUrl }) {
       const res = await api.post("/uploads/receipt", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+
+      if (!res.data?.url) {
+        throw new Error("Server returned an invalid receipt upload URL.");
+      }
 
       setStatus("done");
       onScanned({

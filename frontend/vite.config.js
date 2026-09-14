@@ -33,10 +33,10 @@ export default defineConfig({
       workbox: {
         // Cache the app shell; API calls always go to the network (we don't
         // want stale balances or expenses served from a cache).
-        navigateFallbackDenylist: [/^\/api\//],
+        navigateFallbackDenylist: [/^\/api\//, /^\/uploads\//],
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
+            urlPattern: ({ url }) => url.pathname.startsWith("/api/") || url.pathname.startsWith("/uploads/"),
             handler: "NetworkOnly",
           },
         ],

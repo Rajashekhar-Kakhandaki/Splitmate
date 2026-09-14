@@ -200,7 +200,7 @@ export default function AddExpenseForm({ room, currentUserId, onCreated, onClose
         note: note || undefined,
         splitWith: "custom",
         computedShares,
-        receiptUrl: receiptUrl || undefined,
+        receiptUrl: receiptUrl !== undefined ? receiptUrl : null,
       };
 
       if (isEditing) {

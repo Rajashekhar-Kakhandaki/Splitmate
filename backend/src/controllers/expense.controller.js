@@ -18,6 +18,23 @@ const CATEGORIES = [
   "Other",
 ];
 
+function getSafeReceiptUrl(receiptUrl) {
+  if (receiptUrl === null || receiptUrl === "") return null;
+  if (typeof receiptUrl !== "string") return undefined;
+
+  const trimmed = receiptUrl.trim();
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    return trimmed;
+  }
+  if (trimmed.startsWith("/uploads/receipts/")) {
+    return trimmed;
+  }
+  if (trimmed.startsWith("uploads/receipts/")) {
+    return `/${trimmed}`;
+  }
+  return undefined;
+}
+
 function serializeExpense(expense) {
   return {
     id: expense.id,
@@ -109,12 +126,7 @@ async function createExpense(req, res, next) {
       shares = calculateEqualShares(numericAmount, includedMemberIds);
     }
 
-    // Only accept URLs our own upload endpoint produced — never trust an
-    // arbitrary client-supplied URL here.
-    const safeReceiptUrl =
-      typeof receiptUrl === "string" && receiptUrl.startsWith("/uploads/receipts/")
-        ? receiptUrl
-        : null;
+    const safeReceiptUrl = getSafeReceiptUrl(receiptUrl) || null;
 
     const expense = await prisma.expense.create({
       data: {
@@ -293,6 +305,37 @@ async function getDashboard(req, res, next) {
       return { day, total: round2(total) };
     });
 
+    // Individual daily spending trend for the logged-in user (allocated share each day)
+    const myDailyTrend = Array.from({ length: daysSoFar }, (_, i) => {
+      const day = i + 1;
+      const total = thisMonthExpenses
+        .filter((e) => e.date.getDate() === day)
+        .reduce((sum, e) => {
+          const share = e.shares.find((s) => s.memberId === req.user.id);
+          return sum + (share ? Number(share.shareAmount) : 0);
+        }, 0);
+      return { day, total: round2(total) };
+    });
+
+    // Individual daily spending trends per member (allocated share each day per member)
+    const individualDailyTrend = membersWithNames.map((m) => {
+      const daily = Array.from({ length: daysSoFar }, (_, i) => {
+        const day = i + 1;
+        const total = thisMonthExpenses
+          .filter((e) => e.date.getDate() === day)
+          .reduce((sum, e) => {
+            const share = e.shares.find((s) => s.memberId === m.user.id);
+            return sum + (share ? Number(share.shareAmount) : 0);
+          }, 0);
+        return { day, total: round2(total) };
+      });
+      return {
+        id: m.user.id,
+        name: m.user.name,
+        daily,
+      };
+    });
+
     // Filter recent expenses visible to current user (only expenses where user is payer or share member)
     const visibleRecentExpenses = allExpenses.filter((e) =>
       e.paidBy === req.user.id || e.shares.some((s) => s.memberId === req.user.id)
@@ -308,6 +351,8 @@ async function getDashboard(req, res, next) {
       monthlyTrend,
       memberContribution,
       dailyTrend,
+      myDailyTrend,
+      individualDailyTrend,
       recentExpenses: visibleRecentExpenses.slice(0, 10).map(serializeExpense),
     });
   } catch (err) {
@@ -363,10 +408,7 @@ async function updateExpense(req, res, next) {
       finalShares = calculateEqualShares(numericAmount, includedMemberIds);
     }
 
-    const safeReceiptUrl =
-      typeof receiptUrl === "string" && receiptUrl.startsWith("/uploads/receipts/")
-        ? receiptUrl
-        : undefined;
+    const safeReceiptUrl = getSafeReceiptUrl(receiptUrl);
 
     const updateData = {
       title: title !== undefined ? title : undefined,

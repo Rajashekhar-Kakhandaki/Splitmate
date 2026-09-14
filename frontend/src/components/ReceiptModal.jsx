@@ -15,7 +15,7 @@ export default function ReceiptModal({ imageUrl, title, onClose }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  if (!imageUrl) return null;
+  if (!imageUrl || !fullUrl) return null;
 
   return (
     <div
