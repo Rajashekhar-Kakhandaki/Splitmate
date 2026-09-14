@@ -34,11 +34,10 @@ export default function AnalyticsCharts({
   memberContribution,
   dailyTrend = [],
   myDailyTrend = [],
-  individualDailyTrend = [],
 }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const [dailyViewMode, setDailyViewMode] = useState("members"); // "members" | "mine" | "group"
+  const [dailyViewMode, setDailyViewMode] = useState("mine"); // "mine" | "group"
 
   const textColor = isDark ? "#8A9E8E" : "#23201A";
   const borderColor = isDark ? "#0F1A14" : "#F5EFDE";
@@ -110,7 +109,7 @@ export default function AnalyticsCharts({
     [memberContribution]
   );
 
-  // Dynamic daily data according to selected dailyViewMode
+  // Dynamic daily data according to selected dailyViewMode ("mine" vs "group")
   const activeDailyData = useMemo(() => {
     const labels = (dailyTrend || []).map((d) => d?.day || "");
 
@@ -121,8 +120,8 @@ export default function AnalyticsCharts({
           {
             label: "Your daily spend",
             data: (myDailyTrend || []).map((d) => d?.total || 0),
-            borderColor: "#B08D57",
-            backgroundColor: "rgba(176, 141, 87, 0.15)",
+            borderColor: "#2F6F5E",
+            backgroundColor: "rgba(47, 111, 94, 0.15)",
             fill: true,
             tension: 0.3,
             pointRadius: 3,
@@ -131,35 +130,22 @@ export default function AnalyticsCharts({
       };
     }
 
-    if (dailyViewMode === "members") {
-      const datasets = (individualDailyTrend || []).map((member, i) => ({
-        label: member.name,
-        data: (member.daily || []).map((d) => d?.total || 0),
-        borderColor: PALETTE[i % PALETTE.length],
-        backgroundColor: PALETTE[i % PALETTE.length],
-        fill: false,
-        tension: 0.3,
-        pointRadius: 3,
-      }));
-      return { labels, datasets };
-    }
-
-    // Default "group" mode
+    // "group" mode
     return {
       labels,
       datasets: [
         {
           label: "Group daily spend",
           data: (dailyTrend || []).map((d) => d?.total || 0),
-          borderColor: "#2F6F5E",
-          backgroundColor: "rgba(47, 111, 94, 0.15)",
+          borderColor: "#B08D57",
+          backgroundColor: "rgba(176, 141, 87, 0.15)",
           fill: true,
           tension: 0.3,
-          pointRadius: 2,
+          pointRadius: 3,
         },
       ],
     };
-  }, [dailyViewMode, dailyTrend, myDailyTrend, individualDailyTrend]);
+  }, [dailyViewMode, dailyTrend, myDailyTrend]);
 
   const hasCategoryData = Object.keys(categoryBreakdown || {}).length > 0;
   const hasDailyData = (dailyTrend || []).length > 0;
@@ -200,19 +186,8 @@ export default function AnalyticsCharts({
           <div className="flex items-center gap-1 bg-ink/5 dark:bg-white/10 p-0.5 rounded-lg border border-ink/10 dark:border-white/10">
             <button
               type="button"
-              onClick={() => setDailyViewMode("members")}
-              className={`px-2 py-0.5 text-[9px] font-mono uppercase tracking-wider rounded-md transition-all ${
-                dailyViewMode === "members"
-                  ? "bg-cover text-white shadow-sm font-semibold"
-                  : "text-ink/60 dark:text-white/60 hover:text-ink dark:hover:text-white"
-              }`}
-            >
-              Members
-            </button>
-            <button
-              type="button"
               onClick={() => setDailyViewMode("mine")}
-              className={`px-2 py-0.5 text-[9px] font-mono uppercase tracking-wider rounded-md transition-all ${
+              className={`px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider rounded-md transition-all ${
                 dailyViewMode === "mine"
                   ? "bg-cover text-white shadow-sm font-semibold"
                   : "text-ink/60 dark:text-white/60 hover:text-ink dark:hover:text-white"
@@ -223,7 +198,7 @@ export default function AnalyticsCharts({
             <button
               type="button"
               onClick={() => setDailyViewMode("group")}
-              className={`px-2 py-0.5 text-[9px] font-mono uppercase tracking-wider rounded-md transition-all ${
+              className={`px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider rounded-md transition-all ${
                 dailyViewMode === "group"
                   ? "bg-cover text-white shadow-sm font-semibold"
                   : "text-ink/60 dark:text-white/60 hover:text-ink dark:hover:text-white"
@@ -238,15 +213,7 @@ export default function AnalyticsCharts({
           <div className="h-56">
             <Line
               data={activeDailyData}
-              options={{
-                ...commonOptions,
-                plugins: {
-                  legend: {
-                    display: dailyViewMode === "members",
-                    labels: { font: { family: "Inter", size: 10 }, color: textColor, boxWidth: 10 },
-                  },
-                },
-              }}
+              options={{ ...commonOptions, plugins: { legend: { display: false } } }}
             />
           </div>
         ) : (
