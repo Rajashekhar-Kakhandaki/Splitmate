@@ -138,6 +138,28 @@ export default function SettleUp({ roomId, currentUserId, onSettled, refreshTrig
     setUpiConfirmPayment(null);
   }
 
+  // Automatic return detector: when returning from UPI app (Google Pay/PhonePe), notify & highlight status check
+  useEffect(() => {
+    if (!upiConfirmPayment) return;
+
+    function handleReturn() {
+      if (document.visibilityState === "visible") {
+        toast("Welcome back! Please confirm if your UPI payment succeeded.", {
+          icon: "⚡",
+          id: "upi-return-toast",
+        });
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleReturn);
+    window.addEventListener("focus", handleReturn);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleReturn);
+      window.removeEventListener("focus", handleReturn);
+    };
+  }, [upiConfirmPayment]);
+
   if (suggestions === null && !error) {
     return <p className="font-mono text-xs text-ink/40 dark:text-dark-ink-muted">loading settle up…</p>;
   }
