@@ -9,7 +9,7 @@ const SALT_ROUNDS = 10;
 // POST /api/auth/signup
 async function signup(req, res, next) {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, phoneNumber } = req.body;
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -19,14 +19,19 @@ async function signup(req, res, next) {
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
     const user = await prisma.user.create({
-      data: { name, email, passwordHash },
+      data: {
+        name,
+        email,
+        passwordHash,
+        phoneNumber: phoneNumber ? phoneNumber.trim() : null,
+      },
     });
 
     const token = signToken({ sub: user.id, email: user.email });
 
     res.status(201).json({
       token,
-      user: { id: user.id, name: user.name, email: user.email, avatarUrl: user.avatarUrl, upiId: user.upiId },
+      user: { id: user.id, name: user.name, email: user.email, avatarUrl: user.avatarUrl, upiId: user.upiId, phoneNumber: user.phoneNumber },
     });
   } catch (err) {
     next(err);
@@ -52,7 +57,7 @@ async function login(req, res, next) {
 
     res.json({
       token,
-      user: { id: user.id, name: user.name, email: user.email, avatarUrl: user.avatarUrl, upiId: user.upiId },
+      user: { id: user.id, name: user.name, email: user.email, avatarUrl: user.avatarUrl, upiId: user.upiId, phoneNumber: user.phoneNumber },
     });
   } catch (err) {
     next(err);
@@ -64,7 +69,7 @@ async function me(req, res, next) {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
-      select: { id: true, name: true, email: true, createdAt: true, avatarUrl: true, upiId: true },
+      select: { id: true, name: true, email: true, createdAt: true, avatarUrl: true, upiId: true, phoneNumber: true },
     });
 
     if (!user) {

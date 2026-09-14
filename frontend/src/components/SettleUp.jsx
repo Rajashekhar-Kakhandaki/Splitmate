@@ -138,6 +138,27 @@ export default function SettleUp({ roomId, currentUserId, onSettled, refreshTrig
     setUpiConfirmPayment(null);
   }
 
+  function sendWhatsAppReminder(s) {
+    const key = `${s.from}-${s.to}`;
+    const amountToRemind = Number(customAmounts[key] !== undefined ? customAmounts[key] : s.amount) || s.amount;
+    const amountFormatted = amountToRemind.toFixed(2);
+
+    const phone = s.fromPhoneNumber ? s.fromPhoneNumber.replace(/[^0-9]/g, "") : "";
+    const myUpi = s.toUpiId ? s.toUpiId.trim() : "";
+    
+    let msg = `Hi ${s.fromName}, friendly reminder from SplitMate! 💸\n`;
+    msg += `You owe ₹${amountFormatted} to ${s.toName}.\n`;
+    if (myUpi) {
+      msg += `Pay via UPI ID: ${myUpi}\n`;
+      msg += `Direct UPI Link: upi://pay?pa=${encodeURIComponent(myUpi)}&pn=${encodeURIComponent(s.toName)}&am=${amountFormatted}&cu=INR\n`;
+    }
+    msg += `Please settle up when you get a chance. Thanks!`;
+
+    const encodedMsg = encodeURIComponent(msg);
+    const waUrl = phone ? `https://wa.me/${phone}?text=${encodedMsg}` : `https://wa.me/?text=${encodedMsg}`;
+    window.open(waUrl, "_blank");
+  }
+
   // Automatic return detector: when returning from UPI app (Google Pay/PhonePe), notify & highlight status check
   useEffect(() => {
     if (!upiConfirmPayment) return;
@@ -285,6 +306,11 @@ export default function SettleUp({ roomId, currentUserId, onSettled, refreshTrig
                       {s.toUpiId}
                     </span>
                   )}
+                  {s.isOverdue && (
+                    <span className="ml-2 text-[10px] font-mono uppercase tracking-wider font-bold bg-owe/10 text-owe border border-owe/30 px-2 py-0.5 rounded-md inline-flex items-center gap-1">
+                      ⏰ 1-Week Overdue
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -312,14 +338,23 @@ export default function SettleUp({ roomId, currentUserId, onSettled, refreshTrig
                 {/* Actions */}
                 <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
                   {iAmReceiver ? (
-                    <button
-                      id={`settle-btn-${key}`}
-                      onClick={() => markSettled(s)}
-                      disabled={settlingKey === key}
-                      className="w-full sm:w-auto text-[10px] font-mono uppercase tracking-widest bg-cover text-paper rounded-lg px-4 py-2.5 hover:bg-cover-light transition-all shadow-md disabled:opacity-60"
-                    >
-                      {settlingKey === key ? "…" : "Mark settled"}
-                    </button>
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <button
+                        onClick={() => sendWhatsAppReminder(s)}
+                        className="flex-1 sm:flex-none text-[10px] font-mono uppercase tracking-widest bg-emerald-600/10 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 rounded-lg px-3 py-2.5 hover:bg-emerald-600/20 transition-all font-semibold cursor-pointer flex items-center justify-center gap-1"
+                        title={`Send 1-click WhatsApp payment reminder to ${s.fromName}`}
+                      >
+                        💬 WhatsApp Remind
+                      </button>
+                      <button
+                        id={`settle-btn-${key}`}
+                        onClick={() => markSettled(s)}
+                        disabled={settlingKey === key}
+                        className="flex-1 sm:flex-none text-[10px] font-mono uppercase tracking-widest bg-cover text-paper rounded-lg px-4 py-2.5 hover:bg-cover-light transition-all shadow-md disabled:opacity-60"
+                      >
+                        {settlingKey === key ? "…" : "Mark settled"}
+                      </button>
+                    </div>
                   ) : iAmPayer ? (
                     pendingNotice ? (
                       <div className="flex items-center gap-2 w-full sm:w-auto">

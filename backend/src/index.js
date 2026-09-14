@@ -8,6 +8,7 @@ const userRoutes = require("./routes/user.routes");
 const roomRoutes = require("./routes/room.routes");
 const uploadRoutes = require("./routes/upload.routes");
 const { errorHandler } = require("./middleware/errorHandler");
+const { startReminderScheduler } = require("./services/reminderScheduler");
 
 const app = express();
 
@@ -40,4 +41,5 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`SplitMate API listening on http://localhost:${PORT}`);
+  startReminderScheduler();
 });

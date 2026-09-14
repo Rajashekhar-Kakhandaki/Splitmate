@@ -33,7 +33,7 @@ async function getBalancesAndSuggestions(roomId) {
     }),
     prisma.roomMember.findMany({
       where: { roomId },
-      include: { user: { select: { id: true, name: true, upiId: true } } },
+      include: { user: { select: { id: true, name: true, upiId: true, phoneNumber: true } } },
     }),
   ]);
 
@@ -65,15 +65,34 @@ async function getBalancesAndSuggestions(roomId) {
 
   const nameById = Object.fromEntries(members.map((m) => [m.user.id, m.user.name]));
   const upiById = Object.fromEntries(members.map((m) => [m.user.id, m.user.upiId]));
+  const phoneById = Object.fromEntries(members.map((m) => [m.user.id, m.user.phoneNumber]));
 
-  return {
-    netBalances,
-    suggestions: suggestions.map((s) => ({
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+
+  const formattedSuggestions = suggestions.map((s) => {
+    // Check if debtor (from) owes on any expense created by creditor (to) > 7 days ago
+    const oldestDebtExpense = expenses.find((e) => {
+      if (e.paidBy !== s.to) return false;
+      const sharesWithFrom = e.shares.some((sh) => sh.memberId === s.from && Number(sh.shareAmount) > 0);
+      if (!sharesWithFrom) return false;
+      return now - new Date(e.date).getTime() > SEVEN_DAYS_MS;
+    });
+
+    return {
       ...s,
       fromName: nameById[s.from] || "Unknown",
       toName: nameById[s.to] || "Unknown",
       toUpiId: upiById[s.to] || null,
-    })),
+      toPhoneNumber: phoneById[s.to] || null,
+      fromPhoneNumber: phoneById[s.from] || null,
+      isOverdue: !!oldestDebtExpense,
+    };
+  });
+
+  return {
+    netBalances,
+    suggestions: formattedSuggestions,
     pendingSettlements: pendingSettlements.map((s) => ({
       ...s,
       amount: Number(s.amount),

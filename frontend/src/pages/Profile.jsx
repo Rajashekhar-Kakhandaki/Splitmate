@@ -14,6 +14,7 @@ export default function Profile() {
   const [name, setName] = useState(user?.name || "");
   const [email, setEmail] = useState(user?.email || "");
   const [upiId, setUpiId] = useState(user?.upiId || "");
+  const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || "");
   const [savingInfo, setSavingInfo] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState("");
@@ -28,7 +29,7 @@ export default function Profile() {
     e.preventDefault();
     setSavingInfo(true);
     try {
-      const res = await api.put("/user/profile", { name, email, upiId });
+      const res = await api.put("/user/profile", { name, email, upiId, phoneNumber });
       updateUser(res.data.user);
       toast.success("Profile updated successfully");
     } catch (err) {
@@ -193,6 +194,20 @@ export default function Profile() {
                 />
                 <span className="text-[10px] text-ink/40 dark:text-white/40 block mt-1">
                   Roommates can pay you directly via Google Pay, PhonePe, or Paytm in 1 click.
+                </span>
+              </label>
+
+              <label className="block">
+                <span className={labelCls}>WhatsApp / Phone Number (Optional)</span>
+                <input
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="e.g. +919876543210 or 9876543210"
+                  className={inputCls}
+                />
+                <span className="text-[10px] text-ink/40 dark:text-white/40 block mt-1">
+                  Used for 1-click WhatsApp payment reminders and automated overdue follow-ups.
                 </span>
               </label>
 
