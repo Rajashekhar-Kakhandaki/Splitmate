@@ -375,6 +375,10 @@ async function updateExpense(req, res, next) {
       return res.status(404).json({ error: "Expense not found" });
     }
 
+    if (existing.paidBy !== req.user.id) {
+      return res.status(403).json({ error: "Only the member who paid for this expense can edit it." });
+    }
+
     const room = await prisma.room.findUnique({ where: { id: roomId }, include: { members: true } });
     const roomMemberIds = room.members.map((m) => m.userId);
 
@@ -453,6 +457,10 @@ async function deleteExpense(req, res, next) {
     });
     if (!existing) {
       return res.status(404).json({ error: "Expense not found" });
+    }
+
+    if (existing.paidBy !== req.user.id) {
+      return res.status(403).json({ error: "Only the member who paid for this expense can delete it." });
     }
 
     await prisma.expense.delete({

@@ -244,19 +244,21 @@ export default function ExpenseHistory() {
                 
                 <div className="divide-y divide-ink/5 dark:divide-white/5">
                   {expenses?.map((exp) => {
-                    const selectedMemberShare = payer ? exp.shares?.find((s) => s.memberId === payer) : null;
-                    const isSelectedMemberPayer = payer ? exp.paidBy.id === payer : true;
+                    const targetUserId = payer || user?.id;
+                    const targetMemberShare = exp.shares?.find((s) => s.memberId === targetUserId);
+                    const isPayerOfExpense = (exp.paidBy?.id || exp.paidBy) === user?.id;
                     const isIndividual = exp.shares && exp.shares.length === 1;
                     const isSelective = exp.shares && exp.shares.length > 1 && room?.members && exp.shares.length < room.members.length;
                     const isExpanded = expandedSharesId === exp.id;
 
                     let displayAmount = exp.amount;
-                    let amountSubtitle = null;
+                    let isSplitAmount = false;
 
-                    if (payer && !isSelectedMemberPayer && selectedMemberShare) {
-                      displayAmount = selectedMemberShare.shareAmount;
-                      const selectedName = room?.members.find((m) => m.id === payer)?.name || "Member";
-                      amountSubtitle = `${selectedName}'s split share (Total bill: ${formatRupees(exp.amount)})`;
+                    if (targetMemberShare) {
+                      displayAmount = targetMemberShare.shareAmount;
+                      if (targetMemberShare.shareAmount !== exp.amount) {
+                        isSplitAmount = true;
+                      }
                     }
 
                     return (
@@ -331,17 +333,13 @@ export default function ExpenseHistory() {
                                 <span>📷 View Receipt</span>
                               </button>
                             )}
-                            {amountSubtitle && (
-                              <p className="text-xs font-mono text-cover dark:text-gold mt-0.5">
-                                {amountSubtitle}
-                              </p>
-                            )}
 
                             {isExpanded && exp.shares && (
                               <div className="mt-3 p-3 bg-purple-500/10 dark:bg-purple-500/15 border border-purple-500/20 rounded-xl text-xs space-y-1.5 animate-fade-in">
-                                <p className="font-mono text-[10px] uppercase tracking-widest text-purple-700 dark:text-purple-300 font-semibold">
-                                  Split Members ({exp.shares.length}):
-                                </p>
+                                <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-widest text-purple-700 dark:text-purple-300 font-semibold">
+                                  <span>Split Members ({exp.shares.length}):</span>
+                                  <span>Total Bill: {formatRupees(exp.amount)}</span>
+                                </div>
                                 <div className="flex flex-wrap gap-2 pt-1">
                                   {exp.shares.map((s) => (
                                     <span key={s.memberId} className="bg-white/80 dark:bg-black/50 text-ink dark:text-white px-2.5 py-1 rounded-lg border border-ink/10 dark:border-white/10 font-mono text-[11px] flex items-center gap-1.5 shadow-sm">
@@ -361,30 +359,37 @@ export default function ExpenseHistory() {
                           </div>
                         </div>
                         <div className="text-right shrink-0 flex items-center gap-4 border-l border-ink/5 dark:border-white/5 pl-4 ml-2 relative">
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 absolute right-4 z-20 bg-white/95 dark:bg-[#1a1a1a]/95 backdrop-blur-md p-1 rounded-xl border border-ink/15 dark:border-white/15 shadow-xl">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingExpense(exp);
-                              }}
-                              className="text-xs uppercase tracking-wider font-semibold text-ink/80 dark:text-white/80 hover:text-cover dark:hover:text-gold px-3 py-1.5 hover:bg-ink/5 dark:hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDeletingExpense(exp);
-                              }}
-                              className="text-xs uppercase tracking-wider font-semibold text-owe hover:text-red-500 px-3 py-1.5 hover:bg-owe/10 rounded-lg transition-colors cursor-pointer"
-                            >
-                              Delete
-                            </button>
-                          </div>
+                          {isPayerOfExpense && (
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 absolute right-4 z-20 bg-white/95 dark:bg-[#1a1a1a]/95 backdrop-blur-md p-1 rounded-xl border border-ink/15 dark:border-white/15 shadow-xl">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingExpense(exp);
+                                }}
+                                className="text-xs uppercase tracking-wider font-semibold text-ink/80 dark:text-white/80 hover:text-cover dark:hover:text-gold px-3 py-1.5 hover:bg-ink/5 dark:hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeletingExpense(exp);
+                                }}
+                                className="text-xs uppercase tracking-wider font-semibold text-owe hover:text-red-500 px-3 py-1.5 hover:bg-owe/10 rounded-lg transition-colors cursor-pointer"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          )}
                           <div className="text-right group-hover:opacity-10 transition-opacity">
                             <p className="font-mono text-xl font-medium text-ink dark:text-white">{formatRupees(displayAmount)}</p>
+                            {isSplitAmount && (
+                              <span className="text-[10px] font-mono text-ink/40 dark:text-white/40 block">
+                                Total bill: {formatRupees(exp.amount)}
+                              </span>
+                            )}
                             <p className="text-[10px] uppercase tracking-widest text-ink/40 dark:text-white/30 mt-1 flex flex-col items-end gap-0.5">
                               <span>
                                 {new Date(exp.date).toLocaleDateString("en-IN", {

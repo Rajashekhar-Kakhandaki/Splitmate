@@ -190,67 +190,85 @@ export default function RoomDetail() {
                 </div>
               ) : (
                 <div className="divide-y divide-ink/5 dark:divide-white/5">
-                  {dashboard.recentExpenses.slice(0, 5).map((exp) => (
-                    <div key={exp.id} className="group flex items-center justify-between py-4 gap-4 hover:bg-ink/5 dark:hover:bg-white/5 -mx-4 px-4 rounded-xl transition-colors">
-                      <div className="flex items-center gap-4 min-w-0">
-                        {exp.receiptUrl ? (
-                          <button
-                            type="button"
-                            onClick={() => setViewingReceipt({ url: exp.receiptUrl, title: exp.title })}
-                            className="shrink-0 relative overflow-hidden rounded-xl border border-ink/10 dark:border-white/10 shadow-sm cursor-pointer group/btn"
-                            title="Click to view bill image"
-                          >
-                            <img
-                              src={receiptImageUrl(exp.receiptUrl)}
-                              alt="Receipt"
-                              onError={(e) => {
-                                e.target.onerror = null;
-                                e.target.style.display = "none";
-                              }}
-                              className="w-12 h-12 object-cover group-hover/btn:scale-110 transition-transform duration-300"
-                            />
-                            <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover/btn:opacity-100 transition-opacity">
-                              <span className="text-white text-xs">📷</span>
-                            </div>
-                          </button>
-                        ) : (
-                          <div className="shrink-0 w-12 h-12 rounded-xl bg-ink/5 dark:bg-white/5 flex items-center justify-center border border-ink/5 dark:border-white/5">
-                            <span className="font-mono text-xs text-ink/40 dark:text-white/40">{exp.category ? exp.category.slice(0, 2).toUpperCase() : "EX"}</span>
-                          </div>
-                        )}
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="text-base font-medium truncate text-ink dark:text-white">{exp.title}</p>
-                            {exp.shares && exp.shares.length === 1 && (
-                              <span className="shrink-0 text-[9px] font-mono uppercase tracking-wider bg-cover/10 text-cover dark:text-gold dark:bg-gold/10 px-2 py-0.5 rounded-full border border-cover/20 dark:border-gold/20">
-                                Personal
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-ink/50 dark:text-white/40 mt-0.5">
-                            {exp.category} · paid by <span className="font-medium text-ink/70 dark:text-white/70">{exp.paidBy?.name || exp.paidBy || "Member"}</span>
-                          </p>
-                          {exp.receiptUrl && (
+                  {dashboard.recentExpenses.slice(0, 5).map((exp) => {
+                    const myShare = exp.shares?.find((s) => s.memberId === user?.id);
+                    let displayAmount = exp.amount;
+                    let isSplitAmount = false;
+
+                    if (myShare) {
+                      displayAmount = myShare.shareAmount;
+                      if (myShare.shareAmount !== exp.amount) {
+                        isSplitAmount = true;
+                      }
+                    }
+
+                    return (
+                      <div key={exp.id} className="group flex items-center justify-between py-4 gap-4 hover:bg-ink/5 dark:hover:bg-white/5 -mx-4 px-4 rounded-xl transition-colors">
+                        <div className="flex items-center gap-4 min-w-0">
+                          {exp.receiptUrl ? (
                             <button
                               type="button"
                               onClick={() => setViewingReceipt({ url: exp.receiptUrl, title: exp.title })}
-                              className="inline-flex items-center gap-1 text-[9px] font-mono uppercase tracking-wider bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400 px-2 py-0.5 rounded-full border border-sky-500/20 transition-all cursor-pointer mt-1"
-                              title="Click to view full receipt photo"
+                              className="shrink-0 relative overflow-hidden rounded-xl border border-ink/10 dark:border-white/10 shadow-sm cursor-pointer group/btn"
+                              title="Click to view bill image"
                             >
-                              <span>📷 View Receipt</span>
+                              <img
+                                src={receiptImageUrl(exp.receiptUrl)}
+                                alt="Receipt"
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.style.display = "none";
+                                }}
+                                className="w-12 h-12 object-cover group-hover/btn:scale-110 transition-transform duration-300"
+                              />
+                              <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover/btn:opacity-100 transition-opacity">
+                                <span className="text-white text-xs">📷</span>
+                              </div>
                             </button>
+                          ) : (
+                            <div className="shrink-0 w-12 h-12 rounded-xl bg-ink/5 dark:bg-white/5 flex items-center justify-center border border-ink/5 dark:border-white/5">
+                              <span className="font-mono text-xs text-ink/40 dark:text-white/40">{exp.category ? exp.category.slice(0, 2).toUpperCase() : "EX"}</span>
+                            </div>
                           )}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-base font-medium truncate text-ink dark:text-white">{exp.title}</p>
+                              {exp.shares && exp.shares.length === 1 && (
+                                <span className="shrink-0 text-[9px] font-mono uppercase tracking-wider bg-cover/10 text-cover dark:text-gold dark:bg-gold/10 px-2 py-0.5 rounded-full border border-cover/20 dark:border-gold/20">
+                                  Personal
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-ink/50 dark:text-white/40 mt-0.5">
+                              {exp.category} · paid by <span className="font-medium text-ink/70 dark:text-white/70">{exp.paidBy?.name || exp.paidBy || "Member"}</span>
+                            </p>
+                            {exp.receiptUrl && (
+                              <button
+                                type="button"
+                                onClick={() => setViewingReceipt({ url: exp.receiptUrl, title: exp.title })}
+                                className="inline-flex items-center gap-1 text-[9px] font-mono uppercase tracking-wider bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400 px-2 py-0.5 rounded-full border border-sky-500/20 transition-all cursor-pointer mt-1"
+                                title="Click to view full receipt photo"
+                              >
+                                <span>📷 View Receipt</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="font-mono text-lg font-medium text-ink dark:text-white">{formatRupees(displayAmount)}</p>
+                          {isSplitAmount && (
+                            <span className="text-[9px] font-mono text-ink/40 dark:text-white/40 block">
+                              Total: {formatRupees(exp.amount)}
+                            </span>
+                          )}
+                          <p className="text-[10px] uppercase tracking-widest text-ink/40 dark:text-white/30 mt-1 flex flex-col items-end gap-0.5">
+                            <span>{new Date(exp.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
+                            <span className="text-[9px] opacity-70">{new Date(exp.date).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}</span>
+                          </p>
                         </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className="font-mono text-lg font-medium text-ink dark:text-white">{formatRupees(exp.amount)}</p>
-                        <p className="text-[10px] uppercase tracking-widest text-ink/40 dark:text-white/30 mt-1 flex flex-col items-end gap-0.5">
-                          <span>{new Date(exp.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
-                          <span className="text-[9px] opacity-70">{new Date(exp.date).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}</span>
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
