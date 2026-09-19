@@ -12,6 +12,7 @@ import DownloadReportButton from "../components/DownloadReportButton.jsx";
 import BudgetAlert from "../components/BudgetAlert.jsx";
 import RecurringExpenses from "../components/RecurringExpenses.jsx";
 import ReceiptModal from "../components/ReceiptModal.jsx";
+import MessagesSection from "../components/MessagesSection.jsx";
 
 export default function RoomDetail() {
   const { id } = useParams();
@@ -302,6 +303,8 @@ export default function RoomDetail() {
             
             <SettleUp roomId={id} currentUserId={user.id} onSettled={loadAll} refreshTrigger={refreshKey} />
             
+            <MessagesSection roomId={id} currentUserId={user.id} onRefresh={loadAll} refreshTrigger={refreshKey} />
+
             <RecurringExpenses
               room={room}
               currentUserId={user.id}
