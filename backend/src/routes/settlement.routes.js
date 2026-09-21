@@ -36,5 +36,6 @@ router.post(
 );
 
 router.delete("/pending/:settlementId", deletePendingSettlement);
+router.delete("/:settlementId", deletePendingSettlement);
 
 module.exports = router;

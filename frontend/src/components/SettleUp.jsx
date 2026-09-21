@@ -57,6 +57,8 @@ export default function SettleUp({ roomId, currentUserId, onSettled, refreshTrig
         receiver: s.to,
         amount: amountToSettle,
         status: "settled",
+        paymentMethod: s.paymentMethod || "Cash",
+        pendingId: s.id,
       });
       setCustomAmounts(prev => {
         const next = { ...prev };
@@ -86,6 +88,7 @@ export default function SettleUp({ roomId, currentUserId, onSettled, refreshTrig
         paymentMethod,
       });
       await refresh();
+      onSettled?.();
     } catch (err) {
       setError(err.response?.data?.error || "Couldn't send notification.");
     } finally {
@@ -302,7 +305,7 @@ export default function SettleUp({ roomId, currentUserId, onSettled, refreshTrig
                 {cancellingId === p.id ? "..." : "Not Received"}
               </button>
               <button
-                onClick={() => markSettled({ from: p.payer, to: p.receiver, amount: p.amount, customAmount: p.amount })}
+                onClick={() => markSettled({ from: p.payer, to: p.receiver, amount: p.amount, customAmount: p.amount, paymentMethod: p.paymentMethod, id: p.id })}
                 disabled={settlingKey === `${p.payer}-${p.receiver}`}
                 className="text-xs font-mono uppercase tracking-widest bg-cover text-paper rounded-lg px-4 py-2 hover:bg-cover-light transition-all shadow-md disabled:opacity-50"
               >

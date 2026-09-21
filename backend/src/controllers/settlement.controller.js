@@ -26,27 +26,28 @@ async function loadMembership(roomId, userId) {
 }
 
 async function getBalancesAndSuggestions(roomId) {
-  const [expenses, settlements, members] = await Promise.all([
+  const members = await prisma.roomMember.findMany({
+    where: { roomId },
+    include: { user: { select: { id: true, name: true, upiId: true, phoneNumber: true } } },
+  });
+  const memberIdsList = members.map((m) => m.user.id);
+  const memberIds = new Set(memberIdsList);
+
+  const [expenses, allSettlements] = await Promise.all([
     prisma.expense.findMany({ where: { roomId }, include: { shares: true } }),
     prisma.settlement.findMany({
-      where: { status: "settled", payerUser: { roomMemberships: { some: { roomId } } } },
-    }),
-    prisma.roomMember.findMany({
-      where: { roomId },
-      include: { user: { select: { id: true, name: true, upiId: true, phoneNumber: true } } },
+      where: { payer: { in: memberIdsList }, receiver: { in: memberIdsList } },
+      orderBy: { date: "desc" },
     }),
   ]);
-
-  // Settlements are per-user, not per-room, so filter to ones that are
-  // actually between two members of *this* room.
-  const memberIds = new Set(members.map((m) => m.user.id));
-  const roomSettlements = settlements.filter(
-    (s) => memberIds.has(s.payer) && memberIds.has(s.receiver)
+  
+  const roomSettlements = allSettlements.filter(
+    (s) => s.status === "settled" && memberIds.has(s.payer) && memberIds.has(s.receiver)
   );
 
-  const pendingSettlements = await prisma.settlement.findMany({
-    where: { status: "pending", payer: { in: Array.from(memberIds) }, receiver: { in: Array.from(memberIds) } },
-  });
+  const pendingSettlements = allSettlements.filter(
+    (s) => s.status === "pending" && memberIds.has(s.payer) && memberIds.has(s.receiver)
+  );
 
   const forEngine = expenses.map((e) => ({
     paidBy: e.paidBy,
@@ -90,16 +91,33 @@ async function getBalancesAndSuggestions(roomId) {
     };
   });
 
+  const allMessages = allSettlements
+    .filter((s) => memberIds.has(s.payer) && memberIds.has(s.receiver))
+    .map((s) => ({
+      ...s,
+      id: s.id,
+      amount: Number(s.amount),
+      payer: s.payer,
+      receiver: s.receiver,
+      fromName: nameById[s.payer] || "Unknown",
+      toName: nameById[s.receiver] || "Unknown",
+      paymentMethod: s.paymentMethod || "Cash",
+      status: s.status,
+      date: s.date,
+    }));
+
   return {
     netBalances,
     suggestions: formattedSuggestions,
     pendingSettlements: pendingSettlements.map((s) => ({
       ...s,
+      id: s.id,
       amount: Number(s.amount),
       fromName: nameById[s.payer] || "Unknown",
       toName: nameById[s.receiver] || "Unknown",
-      paymentMethod: s.paymentMethod,
+      paymentMethod: s.paymentMethod || "Cash",
     })),
+    allMessages,
     nameById,
   };
 }
@@ -111,8 +129,8 @@ async function getSuggestions(req, res, next) {
     const roomId = req.params.id;
     await loadMembership(roomId, req.user.id);
 
-    const { suggestions, pendingSettlements } = await getBalancesAndSuggestions(roomId);
-    res.json({ suggestions, pendingSettlements });
+    const { suggestions, pendingSettlements, allMessages } = await getBalancesAndSuggestions(roomId);
+    res.json({ suggestions, pendingSettlements, allMessages });
   } catch (err) {
     next(err);
   }
@@ -141,6 +159,7 @@ async function listSettlements(req, res, next) {
         amount: Number(s.amount),
         date: s.date,
         status: s.status,
+        paymentMethod: s.paymentMethod || "Cash",
         payer: { id: s.payerUser.id, name: s.payerUser.name },
         receiver: { id: s.receiverUser.id, name: s.receiverUser.name },
       })),
@@ -151,16 +170,14 @@ async function listSettlements(req, res, next) {
 }
 
 // POST /api/rooms/:id/settlements
-// "Mark as settled" — logs that a payment (usually one of the suggested
-// ones) actually happened. Recorded straight as status "settled" since
-// the action itself is the user confirming money already changed hands.
+// Logs a payment or confirms a pending settlement notification.
 async function createSettlement(req, res, next) {
   try {
     const roomId = req.params.id;
     const room = await loadMembership(roomId, req.user.id);
     const memberIds = room.members.map((m) => m.userId);
 
-    const { payer, receiver, amount, status = "settled", paymentMethod } = req.body;
+    const { payer, receiver, amount, status = "settled", paymentMethod, pendingId } = req.body;
 
     if (!memberIds.includes(payer) || !memberIds.includes(receiver)) {
       return res.status(400).json({ error: "Both payer and receiver must be members of this room." });
@@ -175,23 +192,44 @@ async function createSettlement(req, res, next) {
     if (status === "pending" && req.user.id !== payer) {
       return res.status(403).json({ error: "Only the payer can notify that they've paid." });
     }
-    if (status === "settled" && req.user.id !== receiver) {
-      return res.status(403).json({ error: "Only the receiver can confirm and mark this as settled." });
+
+    let settlement;
+    let targetPending = null;
+
+    if (pendingId) {
+      targetPending = await prisma.settlement.findUnique({ where: { id: pendingId } });
+    }
+    if (!targetPending && status === "settled") {
+      targetPending = await prisma.settlement.findFirst({
+        where: { payer, receiver, status: "pending" },
+        orderBy: { date: "desc" },
+      });
     }
 
-    // Clean up any existing pending settlements between these two members in this direction
-    // to prevent duplicate banners or stale notifications.
-    await prisma.settlement.deleteMany({
-      where: { payer, receiver, status: "pending" }
-    });
-
-    const settlement = await prisma.settlement.create({
-      data: { payer, receiver, amount, status, paymentMethod },
-      include: {
-        payerUser: { select: { id: true, name: true } },
-        receiverUser: { select: { id: true, name: true } },
-      },
-    });
+    if (targetPending) {
+      // Update existing pending notification message to settled instead of deleting it
+      settlement = await prisma.settlement.update({
+        where: { id: targetPending.id },
+        data: {
+          status,
+          amount,
+          paymentMethod: paymentMethod || targetPending.paymentMethod || "Cash",
+        },
+        include: {
+          payerUser: { select: { id: true, name: true } },
+          receiverUser: { select: { id: true, name: true } },
+        },
+      });
+    } else {
+      // Create new settlement message record
+      settlement = await prisma.settlement.create({
+        data: { payer, receiver, amount, status, paymentMethod: paymentMethod || "Cash" },
+        include: {
+          payerUser: { select: { id: true, name: true } },
+          receiverUser: { select: { id: true, name: true } },
+        },
+      });
+    }
 
     res.status(201).json({
       settlement: {
@@ -208,9 +246,9 @@ async function createSettlement(req, res, next) {
   }
 }
 
-// DELETE /api/rooms/:id/settlements/pending/:settlementId
-// Allows any room member to delete a pending payment notification message
-// if amounts shift, debt is simplified, or a message was sent by mistake.
+// DELETE /api/rooms/:id/settlements/:settlementId or /pending/:settlementId
+// Allows any room member to delete ANY payment notification message (pending OR settled)
+// at any time if amounts shift, debt is simplified, or a message/record was created by mistake.
 async function deletePendingSettlement(req, res, next) {
   try {
     const { id: roomId, settlementId } = req.params;
@@ -221,18 +259,14 @@ async function deletePendingSettlement(req, res, next) {
     });
 
     if (!existing) {
-      return res.status(404).json({ error: "Pending settlement message not found." });
-    }
-
-    if (existing.status !== "pending") {
-      return res.status(400).json({ error: "Only pending settlement messages can be deleted." });
+      return res.status(404).json({ error: "Settlement message not found." });
     }
 
     await prisma.settlement.delete({
       where: { id: settlementId },
     });
 
-    res.json({ success: true, message: "Payment notification message deleted." });
+    res.json({ success: true, message: "Payment message deleted successfully." });
   } catch (err) {
     next(err);
   }
