@@ -281,6 +281,7 @@ export default function RoomDetail() {
               </p>
               <AnalyticsCharts
                 categoryBreakdown={dashboard.categoryBreakdown}
+                myCategoryBreakdown={dashboard.myCategoryBreakdown}
                 monthlyTrend={dashboard.monthlyTrend}
                 memberContribution={dashboard.memberContribution}
                 dailyTrend={dashboard.dailyTrend}

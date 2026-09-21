@@ -268,6 +268,17 @@ async function getDashboard(req, res, next) {
       categoryBreakdown[e.category] = round2((categoryBreakdown[e.category] || 0) + Number(e.amount));
     }
 
+    // Personal category-wise breakdown, this month — logged-in user's share per category
+    const myCategoryBreakdown = {};
+    for (const e of thisMonthExpenses) {
+      const share = e.shares.find((s) => s.memberId === req.user.id);
+      if (share && Number(share.shareAmount) > 0) {
+        myCategoryBreakdown[e.category] = round2(
+          (myCategoryBreakdown[e.category] || 0) + Number(share.shareAmount)
+        );
+      }
+    }
+
     // Monthly spending trend — last 6 months, oldest first (shared group expenses).
     const monthlyTrend = [];
     for (let i = 5; i >= 0; i--) {
@@ -348,6 +359,7 @@ async function getDashboard(req, res, next) {
       youAreOwed,
       breakdown,
       categoryBreakdown,
+      myCategoryBreakdown,
       monthlyTrend,
       memberContribution,
       dailyTrend,

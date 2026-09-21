@@ -30,6 +30,7 @@ const PALETTE = ["#14251C", "#B08D57", "#2F6F5E", "#A23B3B", "#3B5BA2", "#7A4FA3
 
 export default function AnalyticsCharts({
   categoryBreakdown,
+  myCategoryBreakdown,
   monthlyTrend,
   memberContribution,
   dailyTrend = [],
@@ -37,6 +38,7 @@ export default function AnalyticsCharts({
 }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const [categoryViewMode, setCategoryViewMode] = useState("mine"); // "mine" | "group"
   const [dailyViewMode, setDailyViewMode] = useState("mine"); // "mine" | "group"
 
   const textColor = isDark ? "#8A9E8E" : "#23201A";
@@ -62,10 +64,11 @@ export default function AnalyticsCharts({
     },
   };
 
+  const activeCategoryMap = categoryViewMode === "mine" ? (myCategoryBreakdown || {}) : (categoryBreakdown || {});
+
   const categoryData = useMemo(() => {
-    const safeCategory = categoryBreakdown || {};
-    const labels = Object.keys(safeCategory);
-    const values = Object.values(safeCategory);
+    const labels = Object.keys(activeCategoryMap);
+    const values = Object.values(activeCategoryMap);
     return {
       labels,
       datasets: [
@@ -77,7 +80,7 @@ export default function AnalyticsCharts({
         },
       ],
     };
-  }, [categoryBreakdown, borderColor]);
+  }, [activeCategoryMap, borderColor]);
 
   const monthlyData = useMemo(
     () => ({
@@ -147,18 +150,46 @@ export default function AnalyticsCharts({
     };
   }, [dailyViewMode, dailyTrend, myDailyTrend]);
 
-  const hasCategoryData = Object.keys(categoryBreakdown || {}).length > 0;
+  const hasCategoryData = Object.keys(activeCategoryMap).length > 0;
   const hasDailyData = (dailyTrend || []).length > 0;
 
   return (
     <div className="grid sm:grid-cols-2 gap-5">
-      <ChartCard title="Category breakdown (this month)">
+      <ChartCard
+        title={`Category breakdown (${categoryViewMode === "mine" ? "Your spend" : "Group total"})`}
+        action={
+          <div className="flex items-center gap-1 bg-ink/5 dark:bg-white/10 p-0.5 rounded-lg border border-ink/10 dark:border-white/10">
+            <button
+              type="button"
+              onClick={() => setCategoryViewMode("mine")}
+              className={`px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider rounded-md transition-all ${
+                categoryViewMode === "mine"
+                  ? "bg-cover text-white shadow-sm font-semibold"
+                  : "text-ink/60 dark:text-white/60 hover:text-ink dark:hover:text-white"
+              }`}
+            >
+              Your Spend
+            </button>
+            <button
+              type="button"
+              onClick={() => setCategoryViewMode("group")}
+              className={`px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider rounded-md transition-all ${
+                categoryViewMode === "group"
+                  ? "bg-cover text-white shadow-sm font-semibold"
+                  : "text-ink/60 dark:text-white/60 hover:text-ink dark:hover:text-white"
+              }`}
+            >
+              Group Total
+            </button>
+          </div>
+        }
+      >
         {hasCategoryData ? (
           <div className="h-56">
             <Pie data={categoryData} options={pieOptions} />
           </div>
         ) : (
-          <EmptyChart label="No expenses logged this month yet." />
+          <EmptyChart label={`No ${categoryViewMode === "mine" ? "personal" : "group"} category spend this month yet.`} />
         )}
       </ChartCard>
 
