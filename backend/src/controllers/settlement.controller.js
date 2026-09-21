@@ -272,11 +272,39 @@ async function deletePendingSettlement(req, res, next) {
   }
 }
 
+// PATCH /api/rooms/:id/settlements/:settlementId
+// Allows updating payment method (e.g. switching between UPI and Cash) for corrections
+async function updateSettlementMethod(req, res, next) {
+  try {
+    const { id: roomId, settlementId } = req.params;
+    await loadMembership(roomId, req.user.id);
+    const { paymentMethod } = req.body;
+
+    const existing = await prisma.settlement.findUnique({
+      where: { id: settlementId },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: "Settlement message not found." });
+    }
+
+    const updated = await prisma.settlement.update({
+      where: { id: settlementId },
+      data: { paymentMethod: paymentMethod || "Cash" },
+    });
+
+    res.json({ success: true, settlement: updated });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   getSuggestions,
   listSettlements,
   createSettlement,
   deletePendingSettlement,
+  updateSettlementMethod,
   getBalancesAndSuggestions,
   loadMembership,
 };

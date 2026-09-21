@@ -8,7 +8,8 @@ export default function MessagesSection({ roomId, currentUserId, onRefresh, refr
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState(null);
-  const [filter, setFilter] = useState("all"); // "all", "pending", "settled", "upi", "cash"
+  const [updatingId, setUpdatingId] = useState(null);
+  const [filter, setFilter] = useState("all"); // "all", "pending", "settled", "upi", "cash", "unspecified"
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -39,19 +40,35 @@ export default function MessagesSection({ roomId, currentUserId, onRefresh, refr
     }
   }
 
+  async function handleUpdateMethod(settlementId, newMethod) {
+    setUpdatingId(settlementId);
+    try {
+      await api.patch(`/rooms/${roomId}/settlements/${settlementId}`, { paymentMethod: newMethod });
+      toast.success(`Payment method updated to ${newMethod}`);
+      fetchMessages();
+      onRefresh?.();
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to update payment method");
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
   const filteredMessages = messages.filter((msg) => {
-    const method = (msg.paymentMethod || "Cash").toLowerCase();
+    const rawMethod = (msg.paymentMethod || "").toLowerCase();
     if (filter === "pending") return msg.status === "pending";
     if (filter === "settled") return msg.status === "settled";
-    if (filter === "upi") return method === "upi";
-    if (filter === "cash") return method === "cash";
+    if (filter === "upi") return rawMethod === "upi";
+    if (filter === "cash") return rawMethod === "cash";
+    if (filter === "unspecified") return !msg.paymentMethod;
     return true; // "all"
   });
 
   const pendingCount = messages.filter((m) => m.status === "pending").length;
   const settledCount = messages.filter((m) => m.status === "settled").length;
-  const upiCount = messages.filter((m) => (m.paymentMethod || "Cash").toLowerCase() === "upi").length;
-  const cashCount = messages.filter((m) => (m.paymentMethod || "Cash").toLowerCase() === "cash").length;
+  const upiCount = messages.filter((m) => (m.paymentMethod || "").toLowerCase() === "upi").length;
+  const cashCount = messages.filter((m) => (m.paymentMethod || "").toLowerCase() === "cash").length;
+  const unspecifiedCount = messages.filter((m) => !m.paymentMethod).length;
 
   return (
     <div className="bg-white/40 dark:bg-white/5 backdrop-blur-xl border border-ink/10 dark:border-white/10 rounded-[2rem] p-6 sm:p-8 shadow-sm">
@@ -62,7 +79,7 @@ export default function MessagesSection({ roomId, currentUserId, onRefresh, refr
           </p>
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-medium text-ink dark:text-white flex items-center gap-2">
-              💬 All Messages & History ({messages.length})
+              💬 Messages & History ({messages.length})
             </h2>
             <button
               onClick={() => fetchMessages()}
@@ -131,11 +148,24 @@ export default function MessagesSection({ roomId, currentUserId, onRefresh, refr
           >
             💵 Cash ({cashCount})
           </button>
+          {unspecifiedCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setFilter("unspecified")}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-mono transition-all ${
+                filter === "unspecified"
+                  ? "bg-amber-500/20 text-amber-800 dark:text-amber-200 font-semibold shadow-sm"
+                  : "text-amber-600 dark:text-amber-400 hover:opacity-80"
+              }`}
+            >
+              ❓ Unset ({unspecifiedCount})
+            </button>
+          )}
         </div>
       </div>
 
       <p className="text-xs text-ink/50 dark:text-dark-ink-muted mb-5">
-        Complete history of payment notifications sent, confirmed settlements, UPI & Cash messages. You can delete any message to correct history.
+        Complete history of payment notifications sent, confirmed settlements, UPI & Cash messages. Click the method badge on any message to toggle between UPI & Cash.
       </p>
 
       {loading ? (
@@ -154,7 +184,7 @@ export default function MessagesSection({ roomId, currentUserId, onRefresh, refr
             const isSender = msg.payer === currentUserId;
             const isReceiver = msg.receiver === currentUserId;
             const isPending = msg.status === "pending";
-            const methodUpper = (msg.paymentMethod || "Cash").toUpperCase();
+            const rawMethod = (msg.paymentMethod || "").toUpperCase();
 
             return (
               <div
@@ -199,16 +229,50 @@ export default function MessagesSection({ roomId, currentUserId, onRefresh, refr
                         {isPending ? "⏰ Pending Notification" : "✓ Confirmed Settlement"}
                       </span>
 
-                      {/* Payment Method Tag */}
-                      <span
-                        className={`text-[9px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full font-bold border ${
-                          methodUpper === "UPI"
-                            ? "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/30"
-                            : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
-                        }`}
-                      >
-                        {methodUpper === "UPI" ? "⚡ UPI Payment" : "💵 Cash Payment"}
-                      </span>
+                      {/* Payment Method Badge / Toggle */}
+                      {rawMethod === "UPI" ? (
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateMethod(msg.id, "Cash")}
+                          disabled={updatingId === msg.id}
+                          className="text-[9px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full font-bold border bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/30 hover:bg-indigo-500/20 transition-all cursor-pointer"
+                          title="Click to switch method to Cash"
+                        >
+                          ⚡ UPI Payment ⚙️
+                        </button>
+                      ) : rawMethod === "CASH" ? (
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateMethod(msg.id, "UPI")}
+                          disabled={updatingId === msg.id}
+                          className="text-[9px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full font-bold border bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20 transition-all cursor-pointer"
+                          title="Click to switch method to UPI"
+                        >
+                          💵 Cash Payment ⚙️
+                        </button>
+                      ) : (
+                        <div className="inline-flex items-center gap-1">
+                          <span className="text-[9px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full font-bold border bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30">
+                            ❓ Unset
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateMethod(msg.id, "UPI")}
+                            disabled={updatingId === msg.id}
+                            className="text-[9px] font-mono uppercase bg-indigo-500/20 text-indigo-800 dark:text-indigo-200 px-1.5 py-0.5 rounded hover:bg-indigo-500/30 cursor-pointer"
+                          >
+                            Set UPI
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateMethod(msg.id, "Cash")}
+                            disabled={updatingId === msg.id}
+                            className="text-[9px] font-mono uppercase bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 px-1.5 py-0.5 rounded hover:bg-emerald-500/30 cursor-pointer"
+                          >
+                            Set Cash
+                          </button>
+                        </div>
+                      )}
 
                       {/* Timestamp */}
                       {msg.date && (
