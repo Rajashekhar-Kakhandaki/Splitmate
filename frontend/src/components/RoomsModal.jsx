@@ -2,8 +2,11 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../lib/api";
 import Avatar from "./Avatar.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
+import toast from "react-hot-toast";
 
 export default function RoomsModal({ onClose }) {
+  const { user } = useAuth();
   const [rooms, setRooms] = useState(null);
   const [error, setError] = useState("");
   const navigate = useNavigate();
@@ -13,6 +16,9 @@ export default function RoomsModal({ onClose }) {
 
   const [joinCode, setJoinCode] = useState("");
   const [joining, setJoining] = useState(false);
+
+  const [confirmRoom, setConfirmRoom] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function refreshRooms() {
     const res = await api.get("/rooms");
@@ -41,6 +47,7 @@ export default function RoomsModal({ onClose }) {
     setCreating(true);
     try {
       const res = await api.post("/rooms", { roomName });
+      toast.success("Workspace created successfully");
       onClose();
       navigate(`/rooms/${res.data.room.id}`);
     } catch (err) {
@@ -56,12 +63,27 @@ export default function RoomsModal({ onClose }) {
     setJoining(true);
     try {
       const res = await api.post("/rooms/join", { roomCode: joinCode });
+      toast.success("Joined workspace successfully");
       onClose();
       navigate(`/rooms/${res.data.room.id}`);
     } catch (err) {
       setError(err.response?.data?.error || "Couldn't join that room.");
     } finally {
       setJoining(false);
+    }
+  }
+
+  async function handleDeleteRoom(roomId) {
+    setDeleting(true);
+    try {
+      const res = await api.delete(`/rooms/${roomId}`);
+      toast.success(res.data.message || "Workspace removed successfully");
+      setConfirmRoom(null);
+      await refreshRooms();
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to remove workspace.");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -98,13 +120,47 @@ export default function RoomsModal({ onClose }) {
         }
       `}</style>
 
+      {/* Confirmation Modal */}
+      {confirmRoom && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
+          <div className="bg-paper dark:bg-[#1a1a1a] border border-ink/10 dark:border-white/10 rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-4">
+            <h3 className="font-display text-2xl text-ink dark:text-white">
+              {confirmRoom.createdBy === user?.id ? "Delete Workspace?" : "Leave Workspace?"}
+            </h3>
+            <p className="text-xs text-ink/70 dark:text-white/70 leading-relaxed">
+              {confirmRoom.createdBy === user?.id
+                ? `Are you sure you want to permanently delete "${confirmRoom.roomName}"? All expenses, budgets, and recurring items will be permanently erased for all members.`
+                : `Are you sure you want to leave "${confirmRoom.roomName}"? You will no longer see this workspace.`}
+            </p>
+            <div className="flex items-center justify-end gap-3 pt-4">
+              <button
+                type="button"
+                onClick={() => setConfirmRoom(null)}
+                disabled={deleting}
+                className="px-4 py-2.5 rounded-xl border border-ink/10 dark:border-white/10 text-xs font-mono uppercase text-ink/70 dark:text-white/70 hover:bg-ink/5 dark:hover:bg-white/5 transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteRoom(confirmRoom.id)}
+                disabled={deleting}
+                className="px-5 py-2.5 rounded-xl bg-owe text-white text-xs font-mono uppercase font-bold shadow-md hover:bg-owe/90 transition-all disabled:opacity-50 cursor-pointer"
+              >
+                {deleting ? "Processing..." : confirmRoom.createdBy === user?.id ? "Delete Workspace" : "Leave Workspace"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal Container */}
       <div className="relative w-full max-w-5xl h-[85vh] max-h-[800px] min-h-[500px] flex flex-col md:flex-row bg-paper/95 dark:bg-[#121212]/95 backdrop-blur-3xl rounded-[2rem] shadow-2xl border border-white/40 dark:border-white/10 overflow-hidden animate-modal-enter">
         
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-6 right-6 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-ink/5 dark:bg-white/10 text-ink/60 dark:text-white/60 hover:bg-ink/10 dark:hover:bg-white/20 hover:text-ink dark:hover:text-white transition-all backdrop-blur-md"
+          className="absolute top-6 right-6 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-ink/5 dark:bg-white/10 text-ink/60 dark:text-white/60 hover:bg-ink/10 dark:hover:bg-white/20 hover:text-ink dark:hover:text-white transition-all backdrop-blur-md cursor-pointer"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
             <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
@@ -114,7 +170,7 @@ export default function RoomsModal({ onClose }) {
         {/* Left Column: Room List */}
         <div className="flex-1 flex flex-col p-8 sm:p-14 overflow-y-auto premium-scroll">
           <h2 className="font-display text-4xl sm:text-5xl text-ink dark:text-dark-ink mb-2">Workspaces</h2>
-          <p className="text-ink/50 dark:text-dark-ink-muted mb-10 text-sm sm:text-base">Select a room to switch context.</p>
+          <p className="text-ink/50 dark:text-dark-ink-muted mb-10 text-sm sm:text-base">Select a room to switch context or remove old rooms.</p>
 
           {error && (
             <p className="text-sm text-owe bg-owe/10 border border-owe/30 rounded-xl px-4 py-3 mb-8">
@@ -133,39 +189,70 @@ export default function RoomsModal({ onClose }) {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
-              {rooms.map((room) => (
-                <Link
-                  key={room.id}
-                  to={`/rooms/${room.id}`}
-                  onClick={onClose}
-                  className="group relative flex items-center justify-between p-6 sm:p-7 rounded-2xl bg-white/40 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 border border-transparent hover:border-ink/10 dark:hover:border-white/10 transition-all duration-300 shadow-sm hover:shadow-md"
-                >
-                  <div>
-                    <h3 className="font-display text-2xl sm:text-3xl text-ink dark:text-white group-hover:text-cover transition-colors">{room.roomName}</h3>
-                    <div className="flex items-center gap-3 mt-3">
-                      <span className="font-mono text-[10px] uppercase tracking-[0.2em] px-2 py-1 rounded-md bg-ink/5 dark:bg-black/30 text-ink/60 dark:text-white/50">
-                        {room.roomCode}
-                      </span>
-                      <span className="text-xs text-ink/40 dark:text-white/30">
-                        {room.members.length} member{room.members.length !== 1 ? 's' : ''}
-                      </span>
+              {rooms.map((room) => {
+                const isCreator = room.createdBy === user?.id;
+
+                return (
+                  <div
+                    key={room.id}
+                    className="group relative flex items-center justify-between p-6 sm:p-7 rounded-2xl bg-white/40 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 border border-transparent hover:border-ink/10 dark:hover:border-white/10 transition-all duration-300 shadow-sm hover:shadow-md"
+                  >
+                    <Link
+                      to={`/rooms/${room.id}`}
+                      onClick={onClose}
+                      className="flex-1 min-w-0 pr-4"
+                    >
+                      <h3 className="font-display text-2xl sm:text-3xl text-ink dark:text-white group-hover:text-cover transition-colors truncate">
+                        {room.roomName}
+                      </h3>
+                      <div className="flex flex-wrap items-center gap-3 mt-3">
+                        <span className="font-mono text-[10px] uppercase tracking-[0.2em] px-2 py-1 rounded-md bg-ink/5 dark:bg-black/30 text-ink/60 dark:text-white/50">
+                          {room.roomCode}
+                        </span>
+                        <span className="text-xs text-ink/40 dark:text-white/30">
+                          {room.members.length} member{room.members.length !== 1 ? 's' : ''}
+                        </span>
+                        {isCreator && (
+                          <span className="text-[9px] font-mono uppercase bg-cover/10 text-cover dark:text-gold px-2 py-0.5 rounded font-bold">
+                            Owner
+                          </span>
+                        )}
+                      </div>
+                    </Link>
+
+                    <div className="flex items-center gap-4 shrink-0">
+                      <div className="flex -space-x-3">
+                        {room.members.slice(0, 4).map((m) => (
+                          <div key={m.id} className="ring-4 ring-paper dark:ring-[#121212] rounded-full transition-all group-hover:ring-white dark:group-hover:ring-[#1a1a1a]">
+                            <Avatar name={m.name} size="md" />
+                          </div>
+                        ))}
+                        {room.members.length > 4 && (
+                          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-ink/10 dark:bg-white/10 ring-4 ring-paper dark:ring-[#121212] text-xs font-medium text-ink dark:text-white transition-all group-hover:ring-white dark:group-hover:ring-[#1a1a1a]">
+                            +{room.members.length - 4}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Delete / Leave Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setConfirmRoom(room);
+                        }}
+                        className="p-2.5 rounded-xl bg-owe/10 hover:bg-owe/20 text-owe border border-owe/20 transition-all opacity-80 hover:opacity-100 cursor-pointer"
+                        title={isCreator ? "Delete Workspace" : "Leave Workspace"}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                          <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C7.827 4.025 8.66 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clipRule="evenodd" />
+                        </svg>
+                      </button>
                     </div>
                   </div>
-                  
-                  <div className="flex -space-x-3">
-                    {room.members.slice(0, 5).map((m) => (
-                      <div key={m.id} className="ring-4 ring-paper dark:ring-[#121212] rounded-full transition-all group-hover:ring-white dark:group-hover:ring-[#1a1a1a]">
-                        <Avatar name={m.name} size="md" />
-                      </div>
-                    ))}
-                    {room.members.length > 5 && (
-                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-ink/10 dark:bg-white/10 ring-4 ring-paper dark:ring-[#121212] text-xs font-medium text-ink dark:text-white transition-all group-hover:ring-white dark:group-hover:ring-[#1a1a1a]">
-                        +{room.members.length - 5}
-                      </div>
-                    )}
-                  </div>
-                </Link>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -189,7 +276,7 @@ export default function RoomsModal({ onClose }) {
                 <button
                   type="submit"
                   disabled={creating}
-                  className="w-full bg-cover hover:bg-cover-light text-paper font-medium py-4 rounded-xl transition-colors shadow-lg shadow-cover/20 disabled:opacity-50"
+                  className="w-full bg-cover hover:bg-cover-light text-paper font-medium py-4 rounded-xl transition-colors shadow-lg shadow-cover/20 disabled:opacity-50 cursor-pointer"
                 >
                   {creating ? "Creating..." : "Create Workspace"}
                 </button>
@@ -220,7 +307,7 @@ export default function RoomsModal({ onClose }) {
                 <button
                   type="submit"
                   disabled={joining}
-                  className="w-full bg-ink dark:bg-white hover:bg-ink/80 dark:hover:bg-white/90 text-paper dark:text-ink font-medium py-4 rounded-xl transition-colors shadow-lg shadow-ink/20 dark:shadow-white/10 disabled:opacity-50"
+                  className="w-full bg-ink dark:bg-white hover:bg-ink/80 dark:hover:bg-white/90 text-paper dark:text-ink font-medium py-4 rounded-xl transition-colors shadow-lg shadow-ink/20 dark:shadow-white/10 disabled:opacity-50 cursor-pointer"
                 >
                   {joining ? "Joining..." : "Join Workspace"}
                 </button>

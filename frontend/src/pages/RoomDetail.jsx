@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import api, { receiptImageUrl } from "../lib/api";
 import { formatRupees } from "../lib/format";
 import { useAuth } from "../context/AuthContext.jsx";
+import toast from "react-hot-toast";
 import AppHeader from "../components/AppHeader.jsx";
 import Avatar from "../components/Avatar.jsx";
 import AddExpenseForm from "../components/AddExpenseForm.jsx";
@@ -17,6 +18,7 @@ import MessagesSection from "../components/MessagesSection.jsx";
 export default function RoomDetail() {
   const { id } = useParams();
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const [room, setRoom] = useState(null);
   const [dashboard, setDashboard] = useState(null);
@@ -25,6 +27,9 @@ export default function RoomDetail() {
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [viewingReceipt, setViewingReceipt] = useState(null);
+
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const loadAll = useCallback(async () => {
     const [roomRes, dashboardRes] = await Promise.all([
@@ -47,6 +52,19 @@ export default function RoomDetail() {
     navigator.clipboard.writeText(room.roomCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  }
+
+  async function handleDeleteRoom() {
+    setDeleting(true);
+    try {
+      const res = await api.delete(`/rooms/${id}`);
+      toast.success(res.data.message || "Workspace removed successfully");
+      navigate("/");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to remove workspace.");
+    } finally {
+      setDeleting(false);
+    }
   }
 
   if (error) {
@@ -90,6 +108,40 @@ export default function RoomDetail() {
         }
       `}</style>
 
+      {/* Confirmation Modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
+          <div className="bg-paper dark:bg-[#1a1a1a] border border-ink/10 dark:border-white/10 rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-4">
+            <h3 className="font-display text-2xl text-ink dark:text-white">
+              {room.createdBy === user?.id ? "Delete Workspace?" : "Leave Workspace?"}
+            </h3>
+            <p className="text-xs text-ink/70 dark:text-white/70 leading-relaxed">
+              {room.createdBy === user?.id
+                ? `Are you sure you want to permanently delete "${room.roomName}"? All expenses, budgets, and recurring items will be permanently erased for all members.`
+                : `Are you sure you want to leave "${room.roomName}"? You will no longer see this workspace.`}
+            </p>
+            <div className="flex items-center justify-end gap-3 pt-4">
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(false)}
+                disabled={deleting}
+                className="px-4 py-2.5 rounded-xl border border-ink/10 dark:border-white/10 text-xs font-mono uppercase text-ink/70 dark:text-white/70 hover:bg-ink/5 dark:hover:bg-white/5 transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteRoom}
+                disabled={deleting}
+                className="px-5 py-2.5 rounded-xl bg-owe text-white text-xs font-mono uppercase font-bold shadow-md hover:bg-owe/90 transition-all disabled:opacity-50 cursor-pointer"
+              >
+                {deleting ? "Processing..." : room.createdBy === user?.id ? "Delete Workspace" : "Leave Workspace"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <main className="mx-auto px-6 sm:px-10 lg:px-16 py-12 lg:py-16 max-w-[1400px] w-full animate-fade-in">
         
         {/* Header Section */}
@@ -130,6 +182,14 @@ export default function RoomDetail() {
             >
               History →
             </Link>
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="flex items-center gap-2 rounded-full bg-owe/10 hover:bg-owe/20 text-owe border border-owe/30 px-5 py-2.5 transition-all shadow-sm backdrop-blur-sm font-mono text-[10px] uppercase tracking-widest font-bold cursor-pointer"
+              title={room.createdBy === user?.id ? "Delete Workspace" : "Leave Workspace"}
+            >
+              <span>🗑️</span>
+              <span>{room.createdBy === user?.id ? "Delete Room" : "Leave Room"}</span>
+            </button>
           </div>
         </div>
 
