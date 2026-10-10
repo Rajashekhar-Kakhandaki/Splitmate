@@ -121,7 +121,53 @@ async function getRoom(req, res, next) {
   }
 }
 
-// DELETE /api/rooms/:id — delete a room (if creator) or leave room (if member).
+// POST /api/rooms/:id/leave — Leave workspace
+async function leaveRoom(req, res, next) {
+  try {
+    const roomId = req.params.id;
+    const userId = req.user.id;
+
+    const room = await prisma.room.findUnique({
+      where: { id: roomId },
+      include: { members: { orderBy: { joinedAt: "asc" } } },
+    });
+
+    if (!room) {
+      return res.status(404).json({ error: "Room not found." });
+    }
+
+    const isMember = room.members.some((m) => m.userId === userId);
+    if (!isMember) {
+      return res.status(403).json({ error: "You're not a member of this room." });
+    }
+
+    // Remove member from workspace
+    await prisma.roomMember.delete({
+      where: {
+        roomId_userId: { roomId, userId },
+      },
+    });
+
+    const remainingMembers = room.members.filter((m) => m.userId !== userId);
+
+    if (remainingMembers.length === 0) {
+      // Delete empty room if no members remain
+      await prisma.room.delete({ where: { id: roomId } });
+    } else if (room.createdBy === userId) {
+      // Transfer ownership to next joined member
+      await prisma.room.update({
+        where: { id: roomId },
+        data: { createdBy: remainingMembers[0].userId },
+      });
+    }
+
+    res.json({ success: true, message: "Left workspace successfully." });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// DELETE /api/rooms/:id — delete workspace completely
 async function deleteRoom(req, res, next) {
   try {
     const roomId = req.params.id;
@@ -141,23 +187,16 @@ async function deleteRoom(req, res, next) {
       return res.status(403).json({ error: "You're not a member of this room." });
     }
 
-    const isCreator = room.createdBy === userId;
+    await prisma.room.delete({
+      where: { id: roomId },
+    });
 
-    if (isCreator) {
-      // Creator deletes the workspace entirely
-      await prisma.room.delete({
-        where: { id: roomId },
-      });
-      return res.json({ success: true, message: "Workspace deleted successfully." });
-    } else {
-      // Non-creator member leaves the workspace
-      await prisma.roomMember.delete({
-        where: {
-          roomId_userId: { roomId, userId },
-        },
-      });
-      return res.json({ success: true, message: "Left workspace successfully." });
-    }
+    res.json({ success: true, message: "Workspace deleted successfully." });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // DELETE /api/rooms/:id/members/:memberId — remove a member from a workspace
 async function removeMember(req, res, next) {
   try {
@@ -197,4 +236,4 @@ async function removeMember(req, res, next) {
   }
 }
 
-module.exports = { createRoom, joinRoom, listRooms, getRoom, deleteRoom, removeMember };
+module.exports = { createRoom, joinRoom, listRooms, getRoom, deleteRoom, leaveRoom, removeMember };

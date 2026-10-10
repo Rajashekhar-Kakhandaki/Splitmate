@@ -31,6 +31,9 @@ export default function RoomDetail() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+
   const [confirmRemoveMember, setConfirmRemoveMember] = useState(null);
   const [removingMember, setRemovingMember] = useState(false);
 
@@ -61,12 +64,25 @@ export default function RoomDetail() {
     setDeleting(true);
     try {
       const res = await api.delete(`/rooms/${id}`);
-      toast.success(res.data.message || "Workspace removed successfully");
+      toast.success(res.data.message || "Workspace deleted successfully");
       navigate("/");
     } catch (err) {
-      toast.error(err.response?.data?.error || "Failed to remove workspace.");
+      toast.error(err.response?.data?.error || "Failed to delete workspace.");
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function handleLeaveRoom() {
+    setLeaving(true);
+    try {
+      const res = await api.post(`/rooms/${id}/leave`);
+      toast.success(res.data.message || "Left workspace successfully");
+      navigate("/");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to leave workspace.");
+    } finally {
+      setLeaving(false);
     }
   }
 
@@ -125,17 +141,47 @@ export default function RoomDetail() {
         }
       `}</style>
 
-      {/* Confirmation Modal */}
-      {confirmDelete && (
+      {/* Leave Room Confirmation Modal */}
+      {confirmLeave && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
           <div className="bg-paper dark:bg-[#1a1a1a] border border-ink/10 dark:border-white/10 rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-4">
             <h3 className="font-display text-2xl text-ink dark:text-white">
-              {room.createdBy === user?.id ? "Delete Workspace?" : "Leave Workspace?"}
+              Leave Workspace?
             </h3>
             <p className="text-xs text-ink/70 dark:text-white/70 leading-relaxed">
-              {room.createdBy === user?.id
-                ? `Are you sure you want to permanently delete "${room.roomName}"? All expenses, budgets, and recurring items will be permanently erased for all members.`
-                : `Are you sure you want to leave "${room.roomName}"? You will no longer see this workspace.`}
+              Are you sure you want to leave "{room.roomName}"? You will no longer see this workspace in your account.
+            </p>
+            <div className="flex items-center justify-end gap-3 pt-4">
+              <button
+                type="button"
+                onClick={() => setConfirmLeave(false)}
+                disabled={leaving}
+                className="px-4 py-2.5 rounded-xl border border-ink/10 dark:border-white/10 text-xs font-mono uppercase text-ink/70 dark:text-white/70 hover:bg-ink/5 dark:hover:bg-white/5 transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleLeaveRoom}
+                disabled={leaving}
+                className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-mono uppercase font-bold shadow-md transition-all disabled:opacity-50 cursor-pointer"
+              >
+                {leaving ? "Leaving..." : "Leave Workspace"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Room Confirmation Modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
+          <div className="bg-paper dark:bg-[#1a1a1a] border border-ink/10 dark:border-white/10 rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-4">
+            <h3 className="font-display text-2xl text-owe">
+              Delete Workspace Permanently?
+            </h3>
+            <p className="text-xs text-ink/70 dark:text-white/70 leading-relaxed">
+              Are you sure you want to permanently delete "{room.roomName}"? All expenses, budgets, and recurring items will be permanently erased for all members.
             </p>
             <div className="flex items-center justify-end gap-3 pt-4">
               <button
@@ -152,7 +198,7 @@ export default function RoomDetail() {
                 disabled={deleting}
                 className="px-5 py-2.5 rounded-xl bg-owe text-white text-xs font-mono uppercase font-bold shadow-md hover:bg-owe/90 transition-all disabled:opacity-50 cursor-pointer"
               >
-                {deleting ? "Processing..." : room.createdBy === user?.id ? "Delete Workspace" : "Leave Workspace"}
+                {deleting ? "Deleting..." : "Delete Workspace"}
               </button>
             </div>
           </div>
@@ -199,14 +245,28 @@ export default function RoomDetail() {
             >
               History →
             </Link>
+
+            {/* Leave Room Button */}
             <button
-              onClick={() => setConfirmDelete(true)}
-              className="flex items-center gap-2 rounded-full bg-owe/10 hover:bg-owe/20 text-owe border border-owe/30 px-5 py-2.5 transition-all shadow-sm backdrop-blur-sm font-mono text-[10px] uppercase tracking-widest font-bold cursor-pointer"
-              title={room.createdBy === user?.id ? "Delete Workspace" : "Leave Workspace"}
+              onClick={() => setConfirmLeave(true)}
+              className="flex items-center gap-2 rounded-full bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 px-5 py-2.5 transition-all shadow-sm backdrop-blur-sm font-mono text-[10px] uppercase tracking-widest font-bold cursor-pointer"
+              title="Remove yourself from this workspace"
             >
-              <span>🗑️</span>
-              <span>{room.createdBy === user?.id ? "Delete Room" : "Leave Room"}</span>
+              <span>🚪</span>
+              <span>Leave Room</span>
             </button>
+
+            {/* Delete Room Button (Owner only) */}
+            {room.createdBy === user?.id && (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="flex items-center gap-2 rounded-full bg-owe/10 hover:bg-owe/20 text-owe border border-owe/30 px-5 py-2.5 transition-all shadow-sm backdrop-blur-sm font-mono text-[10px] uppercase tracking-widest font-bold cursor-pointer"
+                title="Permanently delete workspace for all members"
+              >
+                <span>🗑️</span>
+                <span>Delete Room</span>
+              </button>
+            )}
           </div>
         </div>
 

@@ -17,8 +17,8 @@ export default function RoomsModal({ onClose }) {
   const [joinCode, setJoinCode] = useState("");
   const [joining, setJoining] = useState(false);
 
-  const [confirmRoom, setConfirmRoom] = useState(null);
-  const [deleting, setDeleting] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null); // { room, type: "leave" | "delete" }
+  const [processing, setProcessing] = useState(false);
 
   async function refreshRooms() {
     const res = await api.get("/rooms");
@@ -73,17 +73,24 @@ export default function RoomsModal({ onClose }) {
     }
   }
 
-  async function handleDeleteRoom(roomId) {
-    setDeleting(true);
+  async function handleExecuteAction() {
+    if (!confirmAction) return;
+    const { room, type } = confirmAction;
+    setProcessing(true);
     try {
-      const res = await api.delete(`/rooms/${roomId}`);
-      toast.success(res.data.message || "Workspace removed successfully");
-      setConfirmRoom(null);
+      if (type === "leave") {
+        const res = await api.post(`/rooms/${room.id}/leave`);
+        toast.success(res.data.message || "Left workspace successfully");
+      } else {
+        const res = await api.delete(`/rooms/${room.id}`);
+        toast.success(res.data.message || "Workspace deleted successfully");
+      }
+      setConfirmAction(null);
       await refreshRooms();
     } catch (err) {
-      toast.error(err.response?.data?.error || "Failed to remove workspace.");
+      toast.error(err.response?.data?.error || `Failed to ${type} workspace.`);
     } finally {
-      setDeleting(false);
+      setProcessing(false);
     }
   }
 
@@ -121,33 +128,37 @@ export default function RoomsModal({ onClose }) {
       `}</style>
 
       {/* Confirmation Modal */}
-      {confirmRoom && (
+      {confirmAction && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
           <div className="bg-paper dark:bg-[#1a1a1a] border border-ink/10 dark:border-white/10 rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-4">
             <h3 className="font-display text-2xl text-ink dark:text-white">
-              {confirmRoom.createdBy === user?.id ? "Delete Workspace?" : "Leave Workspace?"}
+              {confirmAction.type === "leave" ? "Leave Workspace?" : "Delete Workspace?"}
             </h3>
             <p className="text-xs text-ink/70 dark:text-white/70 leading-relaxed">
-              {confirmRoom.createdBy === user?.id
-                ? `Are you sure you want to permanently delete "${confirmRoom.roomName}"? All expenses, budgets, and recurring items will be permanently erased for all members.`
-                : `Are you sure you want to leave "${confirmRoom.roomName}"? You will no longer see this workspace.`}
+              {confirmAction.type === "leave"
+                ? `Are you sure you want to leave "${confirmAction.room.roomName}"? You will no longer see this workspace.`
+                : `Are you sure you want to permanently delete "${confirmAction.room.roomName}"? All expenses, budgets, and recurring items will be permanently erased for all members.`}
             </p>
             <div className="flex items-center justify-end gap-3 pt-4">
               <button
                 type="button"
-                onClick={() => setConfirmRoom(null)}
-                disabled={deleting}
+                onClick={() => setConfirmAction(null)}
+                disabled={processing}
                 className="px-4 py-2.5 rounded-xl border border-ink/10 dark:border-white/10 text-xs font-mono uppercase text-ink/70 dark:text-white/70 hover:bg-ink/5 dark:hover:bg-white/5 transition-all cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={() => handleDeleteRoom(confirmRoom.id)}
-                disabled={deleting}
-                className="px-5 py-2.5 rounded-xl bg-owe text-white text-xs font-mono uppercase font-bold shadow-md hover:bg-owe/90 transition-all disabled:opacity-50 cursor-pointer"
+                onClick={handleExecuteAction}
+                disabled={processing}
+                className={`px-5 py-2.5 rounded-xl text-white text-xs font-mono uppercase font-bold shadow-md transition-all disabled:opacity-50 cursor-pointer ${
+                  confirmAction.type === "leave"
+                    ? "bg-amber-600 hover:bg-amber-700"
+                    : "bg-owe hover:bg-owe/90"
+                }`}
               >
-                {deleting ? "Processing..." : confirmRoom.createdBy === user?.id ? "Delete Workspace" : "Leave Workspace"}
+                {processing ? "Processing..." : confirmAction.type === "leave" ? "Leave Workspace" : "Delete Workspace"}
               </button>
             </div>
           </div>
@@ -170,7 +181,7 @@ export default function RoomsModal({ onClose }) {
         {/* Left Column: Room List */}
         <div className="flex-1 flex flex-col p-8 sm:p-14 overflow-y-auto premium-scroll">
           <h2 className="font-display text-4xl sm:text-5xl text-ink dark:text-dark-ink mb-2">Workspaces</h2>
-          <p className="text-ink/50 dark:text-dark-ink-muted mb-10 text-sm sm:text-base">Select a room to switch context or remove old rooms.</p>
+          <p className="text-ink/50 dark:text-dark-ink-muted mb-10 text-sm sm:text-base">Select a room to switch context, or leave/delete old rooms.</p>
 
           {error && (
             <p className="text-sm text-owe bg-owe/10 border border-owe/30 rounded-xl px-4 py-3 mb-8">
@@ -195,12 +206,12 @@ export default function RoomsModal({ onClose }) {
                 return (
                   <div
                     key={room.id}
-                    className="group relative flex items-center justify-between p-6 sm:p-7 rounded-2xl bg-white/40 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 border border-transparent hover:border-ink/10 dark:hover:border-white/10 transition-all duration-300 shadow-sm hover:shadow-md"
+                    className="group relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 sm:p-7 rounded-2xl bg-white/40 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 border border-transparent hover:border-ink/10 dark:hover:border-white/10 transition-all duration-300 shadow-sm hover:shadow-md"
                   >
                     <Link
                       to={`/rooms/${room.id}`}
                       onClick={onClose}
-                      className="flex-1 min-w-0 pr-4"
+                      className="flex-1 min-w-0 pr-2"
                     >
                       <h3 className="font-display text-2xl sm:text-3xl text-ink dark:text-white group-hover:text-cover transition-colors truncate">
                         {room.roomName}
@@ -220,35 +231,54 @@ export default function RoomsModal({ onClose }) {
                       </div>
                     </Link>
 
-                    <div className="flex items-center gap-4 shrink-0">
+                    <div className="flex items-center gap-3 shrink-0 justify-between sm:justify-end border-t sm:border-t-0 pt-3 sm:pt-0 border-ink/5 dark:border-white/5">
                       <div className="flex -space-x-3">
-                        {room.members.slice(0, 4).map((m) => (
+                        {room.members.slice(0, 3).map((m) => (
                           <div key={m.id} className="ring-4 ring-paper dark:ring-[#121212] rounded-full transition-all group-hover:ring-white dark:group-hover:ring-[#1a1a1a]">
                             <Avatar name={m.name} size="md" />
                           </div>
                         ))}
-                        {room.members.length > 4 && (
+                        {room.members.length > 3 && (
                           <div className="flex items-center justify-center w-10 h-10 rounded-full bg-ink/10 dark:bg-white/10 ring-4 ring-paper dark:ring-[#121212] text-xs font-medium text-ink dark:text-white transition-all group-hover:ring-white dark:group-hover:ring-[#1a1a1a]">
-                            +{room.members.length - 4}
+                            +{room.members.length - 3}
                           </div>
                         )}
                       </div>
 
-                      {/* Delete / Leave Button */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setConfirmRoom(room);
-                        }}
-                        className="p-2.5 rounded-xl bg-owe/10 hover:bg-owe/20 text-owe border border-owe/20 transition-all opacity-80 hover:opacity-100 cursor-pointer"
-                        title={isCreator ? "Delete Workspace" : "Leave Workspace"}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                          <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C7.827 4.025 8.66 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clipRule="evenodd" />
-                        </svg>
-                      </button>
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-2">
+                        {/* Leave Room Button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setConfirmAction({ room, type: "leave" });
+                          }}
+                          className="flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider px-3 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 transition-all font-semibold cursor-pointer"
+                          title="Leave this workspace"
+                        >
+                          <span>🚪</span>
+                          <span>Leave</span>
+                        </button>
+
+                        {/* Delete Room Button (Owner only) */}
+                        {isCreator && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setConfirmAction({ room, type: "delete" });
+                            }}
+                            className="flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider px-3 py-2 rounded-xl bg-owe/10 hover:bg-owe/20 text-owe border border-owe/30 transition-all font-semibold cursor-pointer"
+                            title="Delete this workspace for everyone"
+                          >
+                            <span>🗑️</span>
+                            <span>Delete</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
