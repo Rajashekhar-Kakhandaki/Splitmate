@@ -1,7 +1,7 @@
 const express = require("express");
 const { body, validationResult } = require("express-validator");
 const { requireAuth } = require("../middleware/auth.middleware");
-const { createRoom, joinRoom, listRooms, getRoom, deleteRoom } = require("../controllers/room.controller");
+const { createRoom, joinRoom, listRooms, getRoom, deleteRoom, removeMember } = require("../controllers/room.controller");
 const { getDashboard } = require("../controllers/expense.controller");
 const { downloadMonthlyReport, downloadExcelReport } = require("../controllers/report.controller");
 const expenseRoutes = require("./expense.routes");
@@ -39,6 +39,7 @@ router.post(
 
 router.get("/:id", getRoom);
 router.delete("/:id", deleteRoom);
+router.delete("/:id/members/:memberId", removeMember);
 router.get("/:id/dashboard", getDashboard);
 router.get("/:id/report", downloadMonthlyReport);
 router.get("/:id/report/excel", downloadExcelReport);

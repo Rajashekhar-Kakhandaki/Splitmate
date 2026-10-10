@@ -31,6 +31,9 @@ export default function RoomDetail() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  const [confirmRemoveMember, setConfirmRemoveMember] = useState(null);
+  const [removingMember, setRemovingMember] = useState(false);
+
   const loadAll = useCallback(async () => {
     const [roomRes, dashboardRes] = await Promise.all([
       api.get(`/rooms/${id}`),
@@ -64,6 +67,20 @@ export default function RoomDetail() {
       toast.error(err.response?.data?.error || "Failed to remove workspace.");
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function handleRemoveMember(memberId) {
+    setRemovingMember(true);
+    try {
+      await api.delete(`/rooms/${id}/members/${memberId}`);
+      toast.success("Member removed from workspace");
+      setConfirmRemoveMember(null);
+      await loadAll();
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to remove member");
+    } finally {
+      setRemovingMember(false);
     }
   }
 
@@ -375,18 +392,40 @@ export default function RoomDetail() {
             {/* Members Widget */}
             <div className="bg-white/40 dark:bg-white/5 border border-ink/10 dark:border-white/10 rounded-[2rem] p-6 backdrop-blur-md">
               <p className="font-mono text-[10px] uppercase tracking-widest text-ink/50 dark:text-white/50 mb-5">
-                Workspace Members
+                Workspace Members ({room.members.length})
               </p>
               <div className="space-y-4">
-                {room.members.map((m) => (
-                  <div key={m.id} className="flex items-center gap-3">
-                    <Avatar name={m.name} size="md" />
-                    <div>
-                      <p className="text-sm font-medium text-ink dark:text-white">{m.name}</p>
-                      <p className="text-xs text-ink/40 dark:text-white/40">{m.email}</p>
+                {room.members.map((m) => {
+                  const isMe = m.id === user?.id;
+                  const isRoomCreator = room.createdBy === user?.id;
+                  const canRemove = (isRoomCreator || isMe) && !isMe;
+
+                  return (
+                    <div key={m.id} className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Avatar name={m.name} size="md" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-ink dark:text-white truncate">
+                            {m.name} {isMe ? "(You)" : ""}
+                          </p>
+                          <p className="text-xs text-ink/40 dark:text-white/40 truncate">{m.email}</p>
+                        </div>
+                      </div>
+                      {canRemove && (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmRemoveMember(m)}
+                          className="p-2 text-owe/70 hover:text-owe hover:bg-owe/10 rounded-lg transition-colors cursor-pointer"
+                          title={`Remove ${m.name} from workspace`}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                            <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C7.827 4.025 8.66 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -394,6 +433,38 @@ export default function RoomDetail() {
 
         </div>
       </main>
+
+      {/* Remove Member Confirmation Modal */}
+      {confirmRemoveMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
+          <div className="bg-paper dark:bg-[#1a1a1a] border border-ink/10 dark:border-white/10 rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-4">
+            <h3 className="font-display text-2xl text-ink dark:text-white">
+              Remove {confirmRemoveMember.name}?
+            </h3>
+            <p className="text-xs text-ink/70 dark:text-white/70 leading-relaxed">
+              Are you sure you want to remove "{confirmRemoveMember.name}" from this workspace? They will no longer have access to workspace expenses or settlements.
+            </p>
+            <div className="flex items-center justify-end gap-3 pt-4">
+              <button
+                type="button"
+                onClick={() => setConfirmRemoveMember(null)}
+                disabled={removingMember}
+                className="px-4 py-2.5 rounded-xl border border-ink/10 dark:border-white/10 text-xs font-mono uppercase text-ink/70 dark:text-white/70 hover:bg-ink/5 dark:hover:bg-white/5 transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRemoveMember(confirmRemoveMember.id)}
+                disabled={removingMember}
+                className="px-5 py-2.5 rounded-xl bg-owe text-white text-xs font-mono uppercase font-bold shadow-md hover:bg-owe/90 transition-all disabled:opacity-50 cursor-pointer"
+              >
+                {removingMember ? "Removing..." : "Remove Member"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {viewingReceipt && (
         <ReceiptModal

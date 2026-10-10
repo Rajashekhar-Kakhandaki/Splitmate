@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import AppHeader from "../components/AppHeader.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import toast from "react-hot-toast";
@@ -9,7 +10,8 @@ const labelCls = "text-[10px] font-mono uppercase tracking-widest text-ink/50 da
 const btnCls = "w-full bg-cover text-paper rounded-[1rem] py-3 text-sm font-medium hover:bg-cover-light transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 disabled:opacity-60";
 
 export default function Profile() {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, logout } = useAuth();
+  const navigate = useNavigate();
   
   const [name, setName] = useState(user?.name || "");
   const [email, setEmail] = useState(user?.email || "");
@@ -22,8 +24,25 @@ export default function Profile() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
 
+  const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
   const fileInputRef = useRef(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  async function handleDeleteAccount() {
+    setDeletingAccount(true);
+    try {
+      await api.delete("/user/account");
+      toast.success("Account deleted successfully");
+      logout();
+      navigate("/auth");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to delete account");
+    } finally {
+      setDeletingAccount(false);
+    }
+  }
 
   async function handleUpdateInfo(e) {
     e.preventDefault();
@@ -265,8 +284,53 @@ export default function Profile() {
               </div>
             </form>
           </section>
+
+          {/* Danger Zone: Delete Account */}
+          <section className="bg-owe/5 dark:bg-owe/10 backdrop-blur-xl border border-owe/20 rounded-[2rem] p-6 sm:p-8 shadow-sm space-y-4">
+            <h2 className="text-lg font-medium text-owe font-display">Danger Zone</h2>
+            <p className="text-xs text-ink/70 dark:text-white/70 leading-relaxed">
+              Permanently delete your SplitMate user account and all personal data. This action cannot be undone.
+            </p>
+            <button
+              type="button"
+              onClick={() => setConfirmDeleteAccount(true)}
+              className="px-5 py-3 bg-owe text-white font-mono text-xs uppercase tracking-wider rounded-xl hover:bg-owe/90 font-bold transition-all shadow-md cursor-pointer"
+            >
+              Delete SplitMate Account
+            </button>
+          </section>
         </div>
       </main>
+
+      {/* Account Deletion Confirmation Modal */}
+      {confirmDeleteAccount && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
+          <div className="bg-paper dark:bg-[#1a1a1a] border border-ink/10 dark:border-white/10 rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-4">
+            <h3 className="font-display text-2xl text-owe">Delete Account Permanently?</h3>
+            <p className="text-xs text-ink/70 dark:text-white/70 leading-relaxed">
+              Are you sure you want to delete your SplitMate user account ({user?.email})? All your personal expenses, created rooms, and account data will be permanently removed.
+            </p>
+            <div className="flex items-center justify-end gap-3 pt-4">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteAccount(false)}
+                disabled={deletingAccount}
+                className="px-4 py-2.5 rounded-xl border border-ink/10 dark:border-white/10 text-xs font-mono uppercase text-ink/70 dark:text-white/70 hover:bg-ink/5 dark:hover:bg-white/5 transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteAccount}
+                disabled={deletingAccount}
+                className="px-5 py-2.5 rounded-xl bg-owe text-white text-xs font-mono uppercase font-bold shadow-md hover:bg-owe/90 transition-all disabled:opacity-50 cursor-pointer"
+              >
+                {deletingAccount ? "Deleting Account..." : "Yes, Delete My Account"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

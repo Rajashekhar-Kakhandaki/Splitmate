@@ -71,4 +71,41 @@ async function changePassword(req, res, next) {
   }
 }
 
-module.exports = { updateProfile, changePassword };
+// DELETE /api/user/account — permanently delete user account from SplitMate
+async function deleteUserAccount(req, res, next) {
+  try {
+    const userId = req.user.id;
+
+    // Delete rooms created by user (cascades to room members, expenses, recurring, budget)
+    await prisma.room.deleteMany({ where: { createdBy: userId } });
+
+    // Delete user memberships in other rooms
+    await prisma.roomMember.deleteMany({ where: { userId } });
+
+    // Delete personal expenses
+    await prisma.personalExpense.deleteMany({ where: { userId } });
+
+    // Delete recurring expenses where user is payer
+    await prisma.recurringExpense.deleteMany({ where: { paidBy: userId } });
+
+    // Delete settlements involving user
+    await prisma.settlement.deleteMany({
+      where: { OR: [{ payer: userId }, { receiver: userId }] },
+    });
+
+    // Delete expense shares
+    await prisma.expenseShare.deleteMany({ where: { memberId: userId } });
+
+    // Delete expenses paid by user
+    await prisma.expense.deleteMany({ where: { paidBy: userId } });
+
+    // Delete user account
+    await prisma.user.delete({ where: { id: userId } });
+
+    res.json({ success: true, message: "Account deleted successfully." });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { updateProfile, changePassword, deleteUserAccount };

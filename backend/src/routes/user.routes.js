@@ -1,6 +1,6 @@
 const express = require("express");
 const { body, validationResult } = require("express-validator");
-const { updateProfile, changePassword } = require("../controllers/user.controller");
+const { updateProfile, changePassword, deleteUserAccount } = require("../controllers/user.controller");
 const { requireAuth } = require("../middleware/auth.middleware");
 
 const router = express.Router();
@@ -35,5 +35,7 @@ router.put(
   validate,
   changePassword
 );
+
+router.delete("/account", requireAuth, deleteUserAccount);
 
 module.exports = router;
